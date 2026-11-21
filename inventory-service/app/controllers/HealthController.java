@@ -7,7 +7,7 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.Instant;
 import java.sql.Connection;
-import javax.sql.DataSource;
+import play.db.Database;
 
 /**
  * Controller xử lý Health Check cho Consul
@@ -20,11 +20,11 @@ import javax.sql.DataSource;
 @Singleton
 public class HealthController extends Controller {
     
-    private final DataSource dataSource;
+    private final Database database;
     
     @Inject
-    public HealthController(DataSource dataSource) {
-        this.dataSource = dataSource;
+    public HealthController(Database database) {
+        this.database = database;
     }
     
     /**
@@ -105,7 +105,7 @@ public class HealthController extends Controller {
      * @return true nếu database OK, false nếu lỗi
      */
     private boolean kiemTraDatabase() {
-        try (Connection conn = dataSource.getConnection()) {
+        try (Connection conn = database.getConnection()) {
             return conn.isValid(3); // Timeout 3 giây
         } catch (Exception e) {
             return false;
