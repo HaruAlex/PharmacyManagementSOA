@@ -5,9 +5,9 @@ import play.mvc.Filter;
 import play.mvc.Http;
 import play.mvc.Result;
 import org.apache.pekko.stream.Materializer;
+import com.typesafe.config.Config;
 
 import javax.inject.Inject;
-import javax.inject.Named;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Function;
 
@@ -30,9 +30,9 @@ public class RequestResponseLoggingFilter extends Filter {
     private final String instanceId;
     
     @Inject
-    public RequestResponseLoggingFilter(Materializer materializer, @Named("service.instance.id") String instanceId) {
+    public RequestResponseLoggingFilter(Materializer materializer, Config config) {
         super(materializer);
-        this.instanceId = instanceId;
+        this.instanceId = config.hasPath("service.instance.id") ? config.getString("service.instance.id") : "gateway-1";
     }
     
     @Override

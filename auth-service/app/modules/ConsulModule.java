@@ -4,10 +4,10 @@ import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.agent.model.NewService;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import com.typesafe.config.Config;
 import play.Logger;
 
 import javax.inject.Inject;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.net.InetAddress;
 
@@ -36,24 +36,20 @@ public class ConsulModule extends AbstractModule {
     /**
      * Tạo ConsulClient singleton và đăng ký service
      * 
-     * @param consulHost Consul host (mặc định localhost)
-     * @param consulPort Consul port (mặc định 8500)
-     * @param serviceName Tên service (từ application.conf)
-     * @param serviceHost Host service (lấy từ InetAddress)
-     * @param servicePort Cổng service (từ application.conf)
-     * @param instanceId Instance ID (từ system property)
+     * @param config Typesafe Config
      * @return ConsulClient đã cấu hình và đăng ký service
      */
     @Provides
     @Singleton
-    public ConsulClient consulClient(
-            @Named("consul.host") String consulHost,
-            @Named("consul.port") int consulPort,
-            @Named("service.name") String serviceName,
-            @Named("service.host") String serviceHost,
-            @Named("service.port") int servicePort,
-            @Named("service.instance.id") String instanceId
-    ) {
+    public ConsulClient consulClient(Config config) {
+        // Lấy config từ application.conf
+        String consulHost = config.hasPath("consul.host") ? config.getString("consul.host") : "localhost";
+        int consulPort = config.hasPath("consul.port") ? config.getInt("consul.port") : 8500;
+        String serviceName = config.hasPath("service.name") ? config.getString("service.name") : "unknown-service";
+        String serviceHost = config.hasPath("service.host") ? config.getString("service.host") : "localhost";
+        int servicePort = config.hasPath("service.port") ? config.getInt("service.port") : 9001;
+        String instanceId = config.hasPath("service.instance.id") ? config.getString("service.instance.id") : "unknown-instance";
+        
         // Tạo Consul client
         ConsulClient consulClient = new ConsulClient(consulHost, consulPort);
         
@@ -92,10 +88,11 @@ public class ConsulModule extends AbstractModule {
      * Hook hủy đăng ký service khi application dừng
      * 
      * @param consulClient ConsulClient
-     * @param instanceId Instance ID
+     * @param config Typesafe Config
      */
     @Inject
-    public void onApplicationStop(ConsulClient consulClient, @Named("service.instance.id") String instanceId) {
+    public void onApplicationStop(ConsulClient consulClient, Config config) {
+        String instanceId = config.hasPath("service.instance.id") ? config.getString("service.instance.id") : "unknown-instance";
         // Play sẽ tự gọi hook này khi application dừng
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             try {

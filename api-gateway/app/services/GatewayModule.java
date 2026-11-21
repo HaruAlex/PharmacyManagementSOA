@@ -3,8 +3,8 @@ package services;
 import com.ecwid.consul.v1.ConsulClient;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
+import com.typesafe.config.Config;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
@@ -33,10 +33,9 @@ public class GatewayModule extends AbstractModule {
      */
     @Provides
     @Singleton
-    public ConsulClient consulClient(
-            @Named("consul.host") String consulHost,
-            @Named("consul.port") int consulPort
-    ) {
+    public ConsulClient consulClient(Config config) {
+        String consulHost = config.hasPath("consul.host") ? config.getString("consul.host") : "localhost";
+        int consulPort = config.hasPath("consul.port") ? config.getInt("consul.port") : 8500;
         return new ConsulClient(consulHost, consulPort);
     }
 }
