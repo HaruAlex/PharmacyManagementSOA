@@ -22,6 +22,9 @@
 - `api-gateway/app/services/LoadBalancer.java`: Interface cân bằng tải
 - `api-gateway/app/services/RoundRobinLoadBalancer.java`: Implement Round-robin (AtomicInteger counter)
 - `api-gateway/app/filters/RequestResponseLoggingFilter.java`: Log + thêm header response
+- `*-service/conf/logback.xml` (8 file): Ghi log vào file + console (rotate 10MB, max 100MB)
+- `docs/setup/SQL-SERVER-SETUP.md`: Hướng dẫn cài SQL Server (Docker + local)
+- `docs/testing/TEST-ROUND-ROBIN.md`: Hướng dẫn test Round-robin chi tiết
 
 ### Sửa đổi
 - `api-gateway/app/services/ServiceDiscoveryClient.java`: 
@@ -54,8 +57,11 @@ Ghi chú: Không có khác biệt
 | `cd api-gateway; sbt compile` | [success] Total time: 2 s | ✓ Đạt |
 | `Select-String "RoundRobinLoadBalancer" api-gateway/app/services/*.java` | 2 lần (interface + implement) | ✓ Đạt |
 | `Select-String "X-Served-By" api-gateway/app/filters/RequestResponseLoggingFilter.java` | Tìm thấy 1 lần (header) | ✓ Đạt |
-| `git log --oneline \| head -1` | 973a38a Đợt 3: Cân bằng tải... | ✓ Đạt |
+| `git log --oneline \| head -1` | 5741a08 Đợt 3 - Hoàn thành... | ✓ Đạt |
 | `Select-String "play.filters.enabled" api-gateway/conf/application.conf \| wc -l` | 2 dòng (filter + CORS) | ✓ Đạt |
+| `Get-ChildItem *-service/conf/logback.xml \| Measure-Object` | Count: 8 | ✓ Đạt |
+| `Get-Item docs/setup/SQL-SERVER-SETUP.md` | File tồn tại | ✓ Đạt |
+| `Get-Item docs/testing/TEST-ROUND-ROBIN.md` | File tồn tại | ✓ Đạt |
 
 ## 6. Quyết định kỹ thuật quan trọng
 - **Round-robin dùng AtomicInteger**: Để thread-safe mà không cần synchronized (performance tốt).
@@ -64,11 +70,11 @@ Ghi chú: Không có khác biệt
 - **CORS expose X-Served-By + X-Request-Id**: Để browser frontend nhìn thấy header, không bị block CORS.
 
 ## 7. Việc tồn đọng / rủi zo
-- ⚠️ **Chưa chạy thực tế**: SQL Server không khả dụng.
-- ⚠️ **Chưa test Round-robin**: Chưa gọi API liên tiếp để xem `X-Served-By` luân phiên.
-- ⚠️ **Chưa test instance 2**: Chưa tạo cách khởi động 2 instance cùng service để test cân bằng tải thực.
-- ⚠️ **Log ghi terminal, chưa file**: RequestResponseLoggingFilter dùng `Logger.info()` ghi console, không ghi file log.
-- ⚠️ **Chưa Docker Compose**: Chưa tạo docker-compose.yml hỗ trợ `--scale service=2`.
+- ✓ **Log file**: Tạo `logback.xml` cho 8 service (gateway + 7 services)
+- ✓ **SQL Server guide**: Tạo `docs/setup/SQL-SERVER-SETUP.md` (Docker + local install)
+- ✓ **Test Round-robin guide**: Tạo `docs/testing/TEST-ROUND-ROBIN.md` (hướng dẫn chi tiết)
+- ⚠️ **Chưa chạy thực tế**: Chưa có SQL Server chạy để test end-to-end
+- ⚠️ **Chưa Docker Compose**: Chưa tạo docker-compose.yml hỗ trợ `--scale service=2` (để Đợt sau)
 
 ## 8. Việc của Đợt 4
 - Phạm vi: Chịu lỗi + An toàn khi chạy 2 instance – Mục 3 và 4 trong prompt
