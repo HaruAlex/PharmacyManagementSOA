@@ -1,0 +1,41 @@
+
+# ==============================
+# Play Framework / SBT
+# ==============================
+**/.g8/
+**/target/
+**/.bsp/
+**/.metals/
+**/logs/
+**/*.log
+
+# Ignore Mill build files if using SBT only
+**/build.mill
+
+# ==============================
+# IDE
+# ==============================
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# ==============================
+# Frontend
+# ==============================
+frontend/node_modules/
+frontend/dist/
+
+# ==============================
+# Environment
+# ==============================
+.env
+.env.*
+!.env.example
+
+# ==============================
+# Operating System
+# ==============================
+.DS_Store
+Thumbs.db
