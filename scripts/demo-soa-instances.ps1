@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Full SOA System Test Demo - Khởi động tất cả 14 processes
 
@@ -132,17 +132,17 @@ Write-Host ""
 Write-Host "Checking prerequisites..." -ForegroundColor Yellow
 
 # Java
-if (-not (Check-Prerequisite "Java 11+" "java -version 2>&1")) {
+if (-not (Check-Prerequisite "Java 11+" "java -version")) {
     $allOK = $false
 }
 
 # SBT
-if (-not (Check-Prerequisite "SBT" "sbt --version 2>&1")) {
+if (-not (Check-Prerequisite "SBT" "sbt --version")) {
     $allOK = $false
 }
 
 # Node.js
-if (-not (Check-Prerequisite "Node.js" "node --version 2>&1")) {
+if (-not (Check-Prerequisite "Node.js" "node --version")) {
     $allOK = $false
 }
 
@@ -175,8 +175,8 @@ $gatewayDir = Join-Path $RepoRoot "api-gateway"
 $gatewayProcess = Start-Process -FilePath "sbt" `
     -ArgumentList "`"run 9000`"" `
     -WorkingDirectory $gatewayDir `
-    -RedirectStandardOutput (Join-Path $RepoRoot "logs\gateway-1.log") `
-    -RedirectStandardError (Join-Path $RepoRoot "logs\gateway-1.log") `
+    -RedirectStandardOutput (Join-Path $RepoRoot "logs\gateway-1.out.log") `
+    -RedirectStandardError (Join-Path $RepoRoot "logs\gateway-1.err.log") `
     -PassThru `
     -NoNewWindow
 
@@ -214,8 +214,8 @@ foreach ($serviceInfo in $servicesPorts) {
     $process1 = Start-Process -FilePath "sbt" `
         -ArgumentList "`"run $port1`"" `
         -WorkingDirectory $serviceDir `
-        -RedirectStandardOutput (Join-Path $RepoRoot "logs\$($service)-1.log") `
-        -RedirectStandardError (Join-Path $RepoRoot "logs\$($service)-1.log") `
+        -RedirectStandardOutput (Join-Path $RepoRoot "logs\$($service)-1.out.log") `
+        -RedirectStandardError (Join-Path $RepoRoot "logs\$($service)-1.err.log") `
         -PassThru `
         -NoNewWindow
     
@@ -232,8 +232,8 @@ foreach ($serviceInfo in $servicesPorts) {
         $process2 = Start-Process -FilePath "sbt" `
             -ArgumentList "-Dservice.instance.id=$($service)-2", "`"run $port2`"" `
             -WorkingDirectory $serviceDir `
-            -RedirectStandardOutput (Join-Path $RepoRoot "logs\$($service)-2.log") `
-            -RedirectStandardError (Join-Path $RepoRoot "logs\$($service)-2.log") `
+            -RedirectStandardOutput (Join-Path $RepoRoot "logs\$($service)-2.out.log") `
+            -RedirectStandardError (Join-Path $RepoRoot "logs\$($service)-2.err.log") `
             -PassThru `
             -NoNewWindow
         
@@ -261,11 +261,11 @@ if (-not (Test-Path "$frontendDir\node_modules")) {
 }
 
 $env:PORT = 8080
-$frontendProcess = Start-Process -FilePath "npm" `
-    -ArgumentList "start" `
+$frontendProcess = Start-Process -FilePath "cmd.exe" `
+    -ArgumentList "/c npm start" `
     -WorkingDirectory $frontendDir `
-    -RedirectStandardOutput (Join-Path $RepoRoot "logs\frontend-1.log") `
-    -RedirectStandardError (Join-Path $RepoRoot "logs\frontend-1.log") `
+    -RedirectStandardOutput (Join-Path $RepoRoot "logs\frontend-1.out.log") `
+    -RedirectStandardError (Join-Path $RepoRoot "logs\frontend-1.err.log") `
     -PassThru `
     -NoNewWindow
 
@@ -302,7 +302,7 @@ foreach ($serviceInfo in $servicesPorts) {
     $port1 = $serviceInfo[1]
     $port2 = $serviceInfo[2]
     
-    if (Test-Connection -ComputerName localhost -TCPPort $port1 -Quiet) {
+    if (Test-NetConnection -ComputerName localhost -Port $port1 -InformationLevel Quiet -WarningAction SilentlyContinue) {
         Write-Host "  ✅ $service-1 ($port1)" -ForegroundColor Green
         $runningCount++
     }
@@ -312,7 +312,7 @@ foreach ($serviceInfo in $servicesPorts) {
     }
     
     if ($Instances -eq 2) {
-        if (Test-Connection -ComputerName localhost -TCPPort $port2 -Quiet) {
+        if (Test-NetConnection -ComputerName localhost -Port $port2 -InformationLevel Quiet -WarningAction SilentlyContinue) {
             Write-Host "  ✅ $service-2 ($port2)" -ForegroundColor Green
             $runningCount++
         }
@@ -325,7 +325,7 @@ foreach ($serviceInfo in $servicesPorts) {
 
 Write-Host ""
 Write-Host "Frontend:" -ForegroundColor Cyan
-if (Get-Process -Id $frontendProcess.Id -ErrorAction Ignore) {
+if ($frontendProcess -and (Get-Process -Id $frontendProcess.Id -ErrorAction Ignore)) {
     Write-Host "  ✅ frontend-1 (8080)" -ForegroundColor Green
     $runningCount++
 }
@@ -371,3 +371,7 @@ else {
 Write-Host ""
 Write-Host "Logs location: $RepoRoot\logs\" -ForegroundColor Gray
 Write-Host ""
+
+
+
+

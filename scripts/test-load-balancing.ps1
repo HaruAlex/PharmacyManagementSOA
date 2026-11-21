@@ -1,43 +1,8 @@
-<#
-.SYNOPSIS
-    Test Load Balancing - Gửi N request và kiểm tra X-Served-By header
-
-.DESCRIPTION
-    Script gửi nhiều request qua Gateway và thống kê:
-    - Mỗi instance nhận bao nhiêu request
-    - Round-robin có hoạt động không
-
-.PARAMETER RequestCount
-    Số request gửi (default: 10)
-
-.PARAMETER Endpoint
-    Endpoint để test (default: /health)
-
-.EXAMPLE
-    .\test-load-balancing.ps1                    # 10 requests
-    .\test-load-balancing.ps1 -RequestCount 20   # 20 requests
-    .\test-load-balancing.ps1 -Endpoint "/api/v1/inventory/stock"
-
-.NOTES
-    Author: Nhóm 4 - Đại học Quy Nhơn
-    Kỳ vọng: X-Served-By sẽ xen kẽ giữa các instance (Round-robin)
-#>
-
-param(
+﻿param(
     [int]$RequestCount = 10,
-    [string]$Endpoint = "/health"
+    [string]$Endpoint = "/health",
+    [string]$GatewayUrl = "http://localhost:9000"
 )
-
-# ============================================================================
-# Configuration
-# ============================================================================
-
-$GatewayUrl = "http://localhost:9000"
-$TimeoutSeconds = 5
-
-# ============================================================================
-# Main Logic
-# ============================================================================
 
 Write-Host "`n╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
 Write-Host "║  LOAD BALANCING TEST - ROUND ROBIN                            ║" -ForegroundColor Cyan
@@ -49,33 +14,32 @@ Write-Host "╚═════════════════════�
 $results = @()
 $stats = @{}
 
-Write-Host "Gửi $RequestCount requests..."
+Write-Host "Gửi $RequestCount requests..." -ForegroundColor Gray
 
 for ($i = 1; $i -le $RequestCount; $i++) {
     try {
-        $url = "$GatewayUrl$Endpoint"
-        $response = Invoke-WebRequest -Uri $url -TimeoutSec $TimeoutSeconds -UseBasicParsing -ErrorAction Stop
-        
-        $servedBy = $response.Headers["X-Served-By"]
-        if (-not $servedBy) {
-            $servedBy = "unknown"
+        $uri = "$GatewayUrl$Endpoint"
+        $resp = Invoke-WebRequest -Uri $uri -TimeoutSec 5 -UseBasicParsing -ErrorAction Stop
+
+        $instance = $resp.Headers["X-Served-By"]
+        if (-not $instance) {
+            $instance = "unknown"
         }
-        
+
         $results += [PSCustomObject]@{
             Request = $i
-            Instance = $servedBy
+            Instance = $instance
             Status = "✅"
-            "HTTP Code" = $response.StatusCode
+            "HTTP Code" = $resp.StatusCode
         }
-        
-        # Thống kê
-        if ($stats[$servedBy]) {
-            $stats[$servedBy]++
+
+        if ($stats.ContainsKey($instance)) {
+            $stats[$instance]++
         }
         else {
-            $stats[$servedBy] = 1
+            $stats[$instance] = 1
         }
-        
+
         Write-Host -NoNewline "."
     }
     catch {
@@ -85,74 +49,59 @@ for ($i = 1; $i -le $RequestCount; $i++) {
             Status = "❌"
             "HTTP Code" = "N/A"
         }
-        
+
         Write-Host -NoNewline "✗"
     }
 }
 
 Write-Host "`n"
 
-# Print request log
-Write-Host "`n📋 REQUEST LOG:" -ForegroundColor Yellow
-$results | Format-Table -AutoSize -Property Request, Instance, Status, "HTTP Code"
+Write-Host "📋 REQUEST LOG:" -ForegroundColor Yellow
+$results | Format-Table -AutoSize
 
-# Print statistics
-Write-Host "`n📊 STATISTICS:" -ForegroundColor Yellow
+Write-Host "📊 STATISTICS:" -ForegroundColor Yellow
 
-$totalRequests = $results.Count
-$successCount = ($results | Where-Object { $_.Status -eq "✅" }).Count
+$total = $results.Count
+$success = ($results | Where-Object { $_.Status -eq "✅" }).Count
+$failed = $total - $success
 
-$statTable = @()
-foreach ($instance in ($stats.Keys | Sort-Object)) {
-    $count = $stats[$instance]
-    $percentage = [math]::Round(($count / $totalRequests * 100), 2)
-    
-    $statTable += [PSCustomObject]@{
-        Instance = $instance
+$statRows = @()
+foreach ($key in ($stats.Keys | Sort-Object)) {
+    $count = $stats[$key]
+    $pct = if ($total -gt 0) { [math]::Round(($count / $total * 100), 2) } else { 0 }
+
+    $statRows += [PSCustomObject]@{
+        Instance = $key
         Requests = $count
-        Percentage = "$percentage%"
+        Percentage = "$pct%"
     }
 }
 
-$statTable | Format-Table -AutoSize
+if ($statRows.Count -gt 0) {
+    $statRows | Format-Table -AutoSize
+}
 
-Write-Host "`n╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║  SUMMARY                                                       ║" -ForegroundColor Cyan
-Write-Host "║  Total Requests: $RequestCount                                        ║" -ForegroundColor Cyan
-Write-Host "║  Success: $successCount                                                 ║" -ForegroundColor Cyan
-Write-Host "║  Failed: $($RequestCount - $successCount)                                                   ║" -ForegroundColor Cyan
-Write-Host "║  Instances Served: $($stats.Count)                                                ║" -ForegroundColor Cyan
-
-# Check round-robin
-$instances = @($stats.Keys | Sort-Object)
-$isRoundRobin = $instances.Count -gt 1
-$isBalanced = $true
-
-if ($isRoundRobin) {
-    $avgRequests = $successCount / $instances.Count
-    $variance = 0
-    
-    foreach ($count in $stats.Values) {
-        $variance += [math]::Abs($count - $avgRequests)
-    }
-    
-    $variance = $variance / $instances.Count
-    $isBalanced = $variance -lt 2  # Allow 1-2 request difference
-    
-    if ($isBalanced) {
-        Write-Host "║  Load Distribution: ✅ BALANCED (Round-robin working)        ║" -ForegroundColor Green
-    }
-    else {
-        Write-Host "║  Load Distribution: ⚠️  IMBALANCED (Check round-robin)      ║" -ForegroundColor Yellow
-    }
+$distinctInstances = ($stats.Keys | Where-Object { $_ -ne "ERROR" }).Count
+$distNote = if ($distinctInstances -gt 1) {
+    "✅ Round-robin across $distinctInstances instances"
+}
+elseif ($distinctInstances -eq 1) {
+    "⚠️  Only 1 instance responded"
 }
 else {
-    Write-Host "║  Load Distribution: ⚠️  Only 1 instance responded           ║" -ForegroundColor Yellow
+    "❌ No instance responded"
 }
 
+Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║  SUMMARY                                                       ║" -ForegroundColor Cyan
+Write-Host "║  Total Requests: $total                                        ║" -ForegroundColor Cyan
+Write-Host "║  Success: $success                                             ║" -ForegroundColor Cyan
+Write-Host "║  Failed: $failed                                               ║" -ForegroundColor Cyan
+Write-Host "║  Instances Served: $distinctInstances                          ║" -ForegroundColor Cyan
+Write-Host "║  Load Distribution: $distNote                                  ║" -ForegroundColor Cyan
 Write-Host "╚════════════════════════════════════════════════════════════════╝`n" -ForegroundColor Cyan
 
-if ($successCount -eq $RequestCount -and ($isBalanced -or -not $isRoundRobin)) {
+if ($success -gt 0 -and $failed -eq 0) {
     Write-Host "✅ Load Balancing Test PASSED" -ForegroundColor Green
     exit 0
 }

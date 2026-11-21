@@ -1,4 +1,4 @@
-<# 
+﻿<#
 .SYNOPSIS
     Check health của tất cả services qua Gateway
 
@@ -8,7 +8,7 @@
 
 .PARAMETER Endpoint
     Endpoint để check (default: /health)
-    
+
 .EXAMPLE
     .\check-health.ps1
     .\check-health.ps1 -Endpoint "/healthz"
@@ -62,17 +62,16 @@ $downCount = 0
 
 foreach ($service in $Services) {
     $url = "$($service.Url)$Endpoint"
-    
+
     try {
         $startTime = Get-Date
         $response = Invoke-WebRequest -Uri $url -TimeoutSec $TimeoutSeconds -UseBasicParsing -ErrorAction Stop
         $endTime = Get-Date
         $responseTime = ($endTime - $startTime).TotalMilliseconds
-        
+
         $status = "✅ UP"
         $upCount++
-        $statusColor = "Green"
-        
+
         $results += [PSCustomObject]@{
             Service = $service.Name
             Port = $service.Port
@@ -84,12 +83,12 @@ foreach ($service in $Services) {
     catch {
         $status = "❌ DOWN"
         $downCount++
-        
+
         $results += [PSCustomObject]@{
             Service = $service.Name
             Port = $service.Port
             Status = $status
-            "Response Time (ms)" = "—"
+            "Response Time (ms)" = "-"
             "HTTP Code" = "N/A"
         }
     }
