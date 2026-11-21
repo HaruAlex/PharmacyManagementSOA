@@ -1,50 +1,59 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-
-<!-- https://www.playframework.com/documentation/latest/SettingsLogger -->
-
-<!DOCTYPE configuration>
-
+<?xml version="1.0" encoding="UTF-8"?>
 <configuration>
-  <import class="ch.qos.logback.classic.encoder.PatternLayoutEncoder"/>
-  <import class="ch.qos.logback.classic.AsyncAppender"/>
-  <import class="ch.qos.logback.core.FileAppender"/>
-  <import class="ch.qos.logback.core.ConsoleAppender"/>
-
-  <appender name="FILE" class="FileAppender">
-    <file>${application.home:-.}/logs/application.log</file>
-    <encoder class="PatternLayoutEncoder">
-      <charset>UTF-8</charset>
-      <pattern>%d{yyyy-MM-dd HH:mm:ss} %highlight(%-5level) %cyan(%logger{36}) %magenta(%X{pekkoSource}) %msg%n</pattern>
-    </encoder>
-  </appender>
-
-  <appender name="STDOUT" class="ConsoleAppender">
-    <!--
-         On Windows, enabling Jansi is recommended to benefit from color code interpretation on DOS command prompts,
-         which otherwise risk being sent ANSI escape sequences that they cannot interpret.
-         See https://logback.qos.ch/manual/layouts.html#coloring
+    <!-- ============================================================================
+         LOGBACK CONFIGURATION FOR API GATEWAY
+         ============================================================================
+         
+         Ghi log vào file và console.
+         
+         Đợt 3: Giải quyết việc tồn đọng - Log file
+         
+         @author Nhóm 4 - Đại học Quy Nhơn
     -->
-    <!-- <withJansi>true</withJansi> -->
-    <encoder class="PatternLayoutEncoder">
-      <charset>UTF-8</charset>
-      <pattern>%d{yyyy-MM-dd HH:mm:ss} %highlight(%-5level) %cyan(%logger{36}) %magenta(%X{pekkoSource}) %msg%n</pattern>
-    </encoder>
-  </appender>
+    
+    <!-- Appender ghi file log -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/gateway.log</file>
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+        <!-- Rotate file log khi vượt 10MB -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/gateway.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>10</maxHistory>
+            <totalSizeCap>100MB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
 
-  <appender name="ASYNCFILE" class="AsyncAppender">
-    <appender-ref ref="FILE"/>
-  </appender>
+    <!-- Appender ghi console (stdout) -->
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
 
-  <appender name="ASYNCSTDOUT" class="AsyncAppender">
-    <appender-ref ref="STDOUT"/>
-  </appender>
+    <!-- Logger cho ServiceDiscoveryClient (Service Discovery) -->
+    <logger name="services.ServiceDiscoveryClient" level="INFO" additivity="false">
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="STDOUT"/>
+    </logger>
 
-  <logger name="play" level="INFO"/>
-  <logger name="application" level="DEBUG"/>
+    <!-- Logger cho RequestResponseLoggingFilter (Request/Response Logging) -->
+    <logger name="filters.RequestResponseLoggingFilter" level="INFO" additivity="false">
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="STDOUT"/>
+    </logger>
 
-  <root level="WARN">
-    <appender-ref ref="ASYNCFILE"/>
-    <appender-ref ref="ASYNCSTDOUT"/>
-  </root>
+    <!-- Logger cho RoundRobinLoadBalancer (Load Balancing) -->
+    <logger name="services.RoundRobinLoadBalancer" level="DEBUG" additivity="false">
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="STDOUT"/>
+    </logger>
 
+    <!-- Root logger (tất cả các logger khác) -->
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+        <appender-ref ref="FILE"/>
+    </root>
 </configuration>
