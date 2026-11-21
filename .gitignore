@@ -28,6 +28,13 @@ frontend/node_modules/
 frontend/dist/
 
 # ==============================
+# Scripts Output (Logs & PIDs)
+# ==============================
+logs/
+.pids/
+*.log
+
+# ==============================
 # Environment
 # ==============================
 .env
