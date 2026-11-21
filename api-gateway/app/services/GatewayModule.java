@@ -9,13 +9,14 @@ import javax.inject.Singleton;
 
 /**
  * ============================================================================
- * GATEWAY MODULE - CONSUL CLIENT VÀ LOAD BALANCER CHO API GATEWAY
+ * GATEWAY MODULE - CONSUL CLIENT + LOAD BALANCER + IDEMPOTENCY
  * ============================================================================
  * 
  * API Gateway cần ConsulClient để discover service, không đăng ký.
  * 
  * Đợt 2: Khám phá dịch vụ (Service Discovery)
  * Đợt 3: Thêm LoadBalancer (Round-robin)
+ * Đợt 4: Thêm IdempotencyCache
  * 
  * @author Nhóm 4 - Đại học Quy Nhơn
  */
@@ -25,6 +26,9 @@ public class GatewayModule extends AbstractModule {
     protected void configure() {
         // Đợt 3: Bind LoadBalancer implementation (Round-robin)
         bind(LoadBalancer.class).to(RoundRobinLoadBalancer.class).in(Singleton.class);
+        
+        // Đợt 4: Bind IdempotencyCache
+        bind(IdempotencyCache.class).to(InMemoryIdempotencyCache.class).in(Singleton.class);
     }
 
     /**
