@@ -26,6 +26,13 @@ public class BulkheadRegistry {
     private static final int MAX_QUEUE_SIZE = 5;
     
     /**
+     * Get all bulkheads for metrics collection
+     */
+    public Map<String, BulkheadExecutor> getAllBulkheads() {
+        return new ConcurrentHashMap<>(executors);
+    }
+    
+    /**
      * Lấy hoặc tạo bulkhead executor cho service
      * 
      * @param serviceName Tên service

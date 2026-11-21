@@ -157,6 +157,16 @@ public class SimpleCircuitBreaker implements CircuitBreaker {
         return name;
     }
     
+    @Override
+    public int getFailureCount() {
+        return failureCount.get();
+    }
+    
+    @Override
+    public int getSuccessCount() {
+        return successCount.get();
+    }
+    
     /**
      * Get metrics for monitoring
      */

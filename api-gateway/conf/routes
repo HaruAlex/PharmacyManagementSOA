@@ -3,11 +3,12 @@
 # ~~~~
 
 # ============================================================================
-# HEALTH CHECK ENDPOINTS
+# HEALTH CHECK ENDPOINTS (Đợt 6)
 # ============================================================================
 # Dùng cho monitoring API Gateway
-GET     /health                             controllers.HealthController.health()
-GET     /health/detailed                    controllers.HealthController.detailedHealth()
+GET     /health                             controllers.MetricsController.health()
+GET     /healthz                            controllers.MetricsController.healthz()
+GET     /metrics                            controllers.MetricsController.metrics()
 
 # An example controller showing a sample home page
 GET     /                           controllers.HomeController.index()

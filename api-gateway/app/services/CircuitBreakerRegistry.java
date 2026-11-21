@@ -24,6 +24,13 @@ public class CircuitBreakerRegistry {
     private final Map<String, CircuitBreaker> breakers = new ConcurrentHashMap<>();
     
     /**
+     * Get all circuit breakers for metrics collection
+     */
+    public Map<String, CircuitBreaker> getAllCircuitBreakers() {
+        return new ConcurrentHashMap<>(breakers);
+    }
+    
+    /**
      * Lấy hoặc tạo circuit breaker cho service
      * 
      * @param serviceName Tên service (e.g., "auth-service")

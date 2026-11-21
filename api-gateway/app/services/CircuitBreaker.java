@@ -56,4 +56,14 @@ public interface CircuitBreaker {
      * Get circuit breaker name (for logging)
      */
     String getName();
+    
+    /**
+     * Get failure count (for metrics)
+     */
+    int getFailureCount();
+    
+    /**
+     * Get success count (for metrics)
+     */
+    int getSuccessCount();
 }

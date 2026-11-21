@@ -111,6 +111,43 @@ public class BulkheadExecutor {
     }
     
     /**
+     * Get active threads count (for metrics)
+     */
+    public int getActiveCount() {
+        if (executor instanceof ThreadPoolExecutor) {
+            return ((ThreadPoolExecutor) executor).getActiveCount();
+        }
+        return 0;
+    }
+    
+    /**
+     * Get queue size (for metrics)
+     */
+    public int getQueueSize() {
+        if (executor instanceof ThreadPoolExecutor) {
+            return ((ThreadPoolExecutor) executor).getQueue().size();
+        }
+        return 0;
+    }
+    
+    /**
+     * Get completed task count (for metrics)
+     */
+    public long getCompletedTaskCount() {
+        if (executor instanceof ThreadPoolExecutor) {
+            return ((ThreadPoolExecutor) executor).getCompletedTaskCount();
+        }
+        return 0;
+    }
+    
+    /**
+     * Get rejected count (for metrics)
+     */
+    public int getRejectedCount() {
+        return rejectedCount.get();
+    }
+    
+    /**
      * Shutdown executor
      */
     public void shutdown() {
