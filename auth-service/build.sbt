@@ -9,6 +9,9 @@ scalaVersion := "2.13.18"
 
 libraryDependencies += guice
 
+// Consul Client - Service Discovery & Registration (Đợt 2)
+libraryDependencies += "com.ecwid.consul" % "consul-api" % "1.4.5"
+
 // Database
 libraryDependencies += "com.microsoft.sqlserver" % "mssql-jdbc" % "12.2.0.jre11"
 libraryDependencies += javaJdbc

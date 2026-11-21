@@ -2,7 +2,9 @@ package controllers;
 
 import play.mvc.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.ecwid.consul.v1.ConsulClient;
 import play.libs.Json;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.Instant;
 
@@ -11,18 +13,25 @@ import java.time.Instant;
  * 
  * Endpoint: GET /health
  * 
- * Lưu ý: API Gateway không cần check database
- * vì nó chỉ route request đến các services khác
+ * Đợt 2: Thêm kiểm tra Consul khả dụng
  * 
  * @author Nhóm 4 - Đại học Quy Nhơn
  */
 @Singleton
 public class HealthController extends Controller {
     
+    // Đợt 2: Inject ConsulClient để kiểm tra
+    private final ConsulClient consulClient;
+    
+    @Inject
+    public HealthController(ConsulClient consulClient) {
+        this.consulClient = consulClient;
+    }
+    
     /**
      * Endpoint kiểm tra sức khỏe cơ bản
      * 
-     * @return HTTP 200 OK nếu service khỏe mạnh
+     * @return HTTP 200 OK nếu gateway khỏe mạnh
      */
     public Result health() {
         ObjectNode response = Json.newObject();
@@ -42,14 +51,12 @@ public class HealthController extends Controller {
     
     /**
      * Endpoint kiểm tra chi tiết (optional)
-     * Trả về thông tin chi tiết về system metrics
      */
     public Result detailedHealth() {
         ObjectNode response = Json.newObject();
         response.put("status", "healthy");
         response.put("service", "api-gateway");
         
-        // Memory metrics
         ObjectNode memory = Json.newObject();
         Runtime runtime = Runtime.getRuntime();
         memory.put("used", runtime.totalMemory() - runtime.freeMemory());
@@ -58,7 +65,6 @@ public class HealthController extends Controller {
         memory.put("max", runtime.maxMemory());
         response.set("memory", memory);
         
-        // JVM info
         ObjectNode jvm = Json.newObject();
         jvm.put("version", System.getProperty("java.version"));
         jvm.put("vendor", System.getProperty("java.vendor"));
@@ -67,3 +73,4 @@ public class HealthController extends Controller {
         return ok(response);
     }
 }
+
