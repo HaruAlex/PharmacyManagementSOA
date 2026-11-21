@@ -29,6 +29,10 @@ public class GatewayModule extends AbstractModule {
         
         // Đợt 4: Bind IdempotencyCache
         bind(IdempotencyCache.class).to(InMemoryIdempotencyCache.class).in(Singleton.class);
+        
+        // Đợt 5: Bind Circuit Breaker + Bulkhead registries
+        bind(CircuitBreakerRegistry.class).in(Singleton.class);
+        bind(BulkheadRegistry.class).in(Singleton.class);
     }
 
     /**

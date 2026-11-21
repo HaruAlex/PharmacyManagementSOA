@@ -8,18 +8,22 @@ import javax.inject.Singleton;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
+import java.util.concurrent.Callable;
 
 /**
  * ============================================================================
  * RESILIENT SERVICE CALLER
  * ============================================================================
  * 
- * Gọi service với retry logic, timeout, và error handling.
+ * Gọi service với retry logic, timeout, circuit breaker, và bulkhead isolation.
  * 
  * Đợt 4: Chịu lỗi (Fault Tolerance)
+ * Đợt 5: Resilience (Circuit Breaker + Bulkhead)
  * - Retry policy (GET idempotent, POST/PUT/DELETE with Idempotency-Key)
  * - Timeout: 5s connection, 10s read
  * - Exponential backoff: 100ms, 200ms
+ * - Circuit Breaker: fail fast khi service chết
+ * - Bulkhead: thread pool isolation, reject nếu queue full
  * 
  * @author Nhóm 4 - Đại học Quy Nhơn
  */
@@ -28,26 +32,28 @@ public class ResilientServiceCaller {
     
     private final ServiceDiscoveryClient serviceDiscoveryClient;
     private final RetryPolicy retryPolicy;
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final BulkheadRegistry bulkheadRegistry;
     
     // Timeout config (milliseconds)
     private static final int CONNECTION_TIMEOUT_MS = 5000;  // 5 seconds
     private static final int READ_TIMEOUT_MS = 10000;        // 10 seconds
+    private static final long BULKHEAD_TIMEOUT_MS = 5000;    // 5 seconds
     
     @Inject
-    public ResilientServiceCaller(ServiceDiscoveryClient serviceDiscoveryClient) {
+    public ResilientServiceCaller(
+            ServiceDiscoveryClient serviceDiscoveryClient,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            BulkheadRegistry bulkheadRegistry
+    ) {
         this.serviceDiscoveryClient = serviceDiscoveryClient;
         this.retryPolicy = new ExponentialBackoffRetryPolicy();
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
+        this.bulkheadRegistry = bulkheadRegistry;
     }
     
     /**
-     * Gọi service với retry + timeout
-     * 
-     * @param serviceName Tên service (e.g., "auth-service")
-     * @param method HTTP method (GET, POST, etc.)
-     * @param path API path (e.g., "/user/profile")
-     * @param requestHeaders Headers gởi kèm
-     * @param body Request body (nếu có)
-     * @return ServiceCallResult chứa status, headers, body
+     * Gọi service với retry + timeout + circuit breaker + bulkhead
      */
     public ServiceCallResult callServiceWithRetry(
             String serviceName,
@@ -56,52 +62,73 @@ public class ResilientServiceCaller {
             Map<String, String> requestHeaders,
             String body
     ) {
+        // Get circuit breaker for this service
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.getOrCreate(serviceName);
+        
+        // Fail fast nếu circuit breaker OPEN
+        if (!circuitBreaker.isCallAllowed()) {
+            Logger.warn("[ResilientCaller] Circuit breaker OPEN for " + serviceName + " - rejecting call");
+            return new ServiceCallResult(503, null, "{\"error\":\"Service temporarily unavailable (circuit open)\"}");
+        }
+        
+        // Get bulkhead executor for this service
+        BulkheadExecutor bulkhead = bulkheadRegistry.getOrCreate(serviceName);
+        
+        // Retry logic
         int attemptNumber = 0;
         Exception lastException = null;
         
-        while (attemptNumber < 3) { // Tối đa 1 lần chính + 2 retry
+        while (attemptNumber < 3) {  // 1 main + 2 retries
             attemptNumber++;
             
             try {
                 Logger.info("[ResilientCaller] Calling " + serviceName + " " + method + " " + path + 
                         " (attempt " + attemptNumber + ")");
                 
-                // Lấy instance từ Consul (round-robin)
-                com.ecwid.consul.v1.health.model.HealthService healthService = 
-                    serviceDiscoveryClient.getHealthyInstance(serviceName);
-                
-                if (healthService == null) {
-                    throw new RuntimeException("No healthy instance found for " + serviceName);
-                }
-                
-                String serviceUrl = serviceDiscoveryClient.getServiceUrl(healthService);
-                String fullUrl = serviceUrl + path;
-                
-                Logger.debug("[ResilientCaller] Instance: " + healthService.getService().getId() + 
-                        " URL: " + fullUrl);
-                
-                // Gọi service
-                ServiceCallResult result = makeHttpCall(method, fullUrl, requestHeaders, body);
-                
-                if (result.isSuccess()) {
-                    Logger.info("[ResilientCaller] ✓ Success (attempt " + attemptNumber + ")");
-                    return result;
-                } else {
-                    // HTTP error (4xx, 5xx)
-                    lastException = new RuntimeException("HTTP " + result.statusCode);
-                    Logger.warn("[ResilientCaller] ✗ HTTP error: " + result.statusCode);
+                // Execute call in bulkhead (thread pool + queue timeout)
+                try {
+                    ServiceCallResult result = bulkhead.execute(
+                        new Callable<ServiceCallResult>() {
+                            @Override
+                            public ServiceCallResult call() throws Exception {
+                                return makeHttpCallInternal(serviceName, method, path, requestHeaders, body);
+                            }
+                        },
+                        BULKHEAD_TIMEOUT_MS
+                    );
                     
-                    // Không retry cho 4xx (client error)
-                    if (result.statusCode >= 400 && result.statusCode < 500) {
+                    if (result.isSuccess()) {
+                        circuitBreaker.recordSuccess();
+                        Logger.info("[ResilientCaller] ✓ Success (attempt " + attemptNumber + ")");
                         return result;
+                    } else {
+                        lastException = new RuntimeException("HTTP " + result.statusCode);
+                        Logger.warn("[ResilientCaller] ✗ HTTP error: " + result.statusCode);
+                        
+                        // Don't retry for 4xx (client error)
+                        if (result.statusCode >= 400 && result.statusCode < 500) {
+                            circuitBreaker.recordFailure();
+                            return result;
+                        }
+                    }
+                } catch (Exception e) {
+                    lastException = e;
+                    Logger.error("[ResilientCaller] Bulkhead exception: " + e.getMessage());
+                    
+                    // Check if bulkhead-related error
+                    if (e.getMessage() != null && e.getMessage().contains("Bulkhead")) {
+                        Logger.error("[ResilientCaller] Bulkhead error - returning 503");
+                        return new ServiceCallResult(503, null, "{\"error\":\"" + e.getMessage() + "\"}");
                     }
                 }
-            } catch (Exception e) {
+                
+            } catch (RuntimeException e) {
                 lastException = e;
-                Logger.error("[ResilientCaller] Exception: " + e.getMessage());
+                Logger.error("[ResilientCaller] Runtime exception: " + e.getMessage());
             }
+
             
-            // Kiểm tra retry policy
+            // Check retry policy
             boolean idempotencyKey = requestHeaders != null && 
                     requestHeaders.containsKey("Idempotency-Key");
             
@@ -121,9 +148,37 @@ public class ResilientServiceCaller {
             }
         }
         
-        // Tất cả retry thất bại
+        // All retries failed
+        circuitBreaker.recordFailure();
         Logger.error("[ResilientCaller] Failed after " + attemptNumber + " attempts");
         return new ServiceCallResult(503, null, "{\"error\":\"Service unavailable after retries\"}");
+    }
+    
+    /**
+     * Actual HTTP call (runs in bulkhead)
+     */
+    private ServiceCallResult makeHttpCallInternal(
+            String serviceName,
+            String method,
+            String path,
+            Map<String, String> requestHeaders,
+            String body
+    ) throws Exception {
+        // Get instance from discovery
+        com.ecwid.consul.v1.health.model.HealthService healthService = 
+            serviceDiscoveryClient.getHealthyInstance(serviceName);
+        
+        if (healthService == null) {
+            throw new RuntimeException("No healthy instance found for " + serviceName);
+        }
+        
+        String serviceUrl = serviceDiscoveryClient.getServiceUrl(healthService);
+        String fullUrl = serviceUrl + path;
+        
+        Logger.debug("[ResilientCaller] Instance: " + healthService.getService().getId() + 
+                " URL: " + fullUrl);
+        
+        return makeHttpCall(method, fullUrl, requestHeaders, body);
     }
     
     /**
@@ -220,3 +275,4 @@ public class ResilientServiceCaller {
         }
     }
 }
+
