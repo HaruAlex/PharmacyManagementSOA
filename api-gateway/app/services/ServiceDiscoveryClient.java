@@ -8,7 +8,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
 
 /**
  * ============================================================================
@@ -18,6 +17,7 @@ import java.util.Random;
  * API Gateway sử dụng Consul để khám phá dịch vụ thay vì hard-code URL.
  * 
  * Đợt 2: Khám phá dịch vụ (Service Discovery)
+ * Đợt 3: Thêm LoadBalancer để cân bằng tải
  * 
  * @author Nhóm 4 - Đại học Quy Nhơn
  */
@@ -25,11 +25,12 @@ import java.util.Random;
 public class ServiceDiscoveryClient {
     
     private final ConsulClient consulClient;
-    private final Random random = new Random();
+    private final LoadBalancer loadBalancer;
     
     @Inject
-    public ServiceDiscoveryClient(ConsulClient consulClient) {
+    public ServiceDiscoveryClient(ConsulClient consulClient, LoadBalancer loadBalancer) {
         this.consulClient = consulClient;
+        this.loadBalancer = loadBalancer;
     }
     
     /**
@@ -56,14 +57,17 @@ public class ServiceDiscoveryClient {
     }
     
     /**
-     * Chọn ngẫu nhiên 1 instance khỏe mạnh
+     * Chọn 1 instance khỏe mạnh bằng LoadBalancer (Round-robin)
+     * 
+     * Đợt 3: Dùng LoadBalancer thay vì random
      */
-    public HealthService getRandomHealthyInstance(String serviceName) {
+    public HealthService getHealthyInstance(String serviceName) {
         List<HealthService> instances = getHealthyServiceInstances(serviceName);
         if (instances.isEmpty()) {
+            Logger.warn("[ServiceDiscovery] Không tìm instance nào: " + serviceName);
             return null;
         }
-        return instances.get(random.nextInt(instances.size()));
+        return loadBalancer.selectInstance(instances);
     }
     
     /**
