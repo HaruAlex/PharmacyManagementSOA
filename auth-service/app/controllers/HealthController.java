@@ -3,8 +3,10 @@ package controllers;
 import play.mvc.*;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import play.libs.Json;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.Instant;
+import com.ecwid.consul.v1.ConsulClient;
 
 /**
  * Controller xử lý Health Check cho Consul
@@ -17,6 +19,13 @@ import java.time.Instant;
 @Singleton
 public class HealthController extends Controller {
     
+    private final ConsulClient consulClient;
+    
+    @Inject
+    public HealthController(ConsulClient consulClient) {
+        this.consulClient = consulClient;
+    }
+    
     /**
      * Endpoint kiểm tra sức khỏe cơ bản
      * 
@@ -28,6 +37,7 @@ public class HealthController extends Controller {
         try {
             response.put("status", "healthy");
             response.put("service", "auth-service");
+            response.put("instance", System.getProperty("service.instance.id", "auth-1"));
             response.put("timestamp", Instant.now().toString());
             return ok(response);
             

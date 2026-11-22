@@ -3,6 +3,41 @@
 # ~~~~
 
 # ============================================================================
+# SERVICE ROUTING - LOAD BALANCED (Đợt 2+)
+# ============================================================================
+# Gateway forward requests tới microservices qua Consul service discovery + load balancing
+
+GET     /auth/*path                         controllers.GatewayController.proxyAuth(path)
+POST    /auth/*path                         controllers.GatewayController.proxyAuth(path)
+PUT     /auth/*path                         controllers.GatewayController.proxyAuth(path)
+DELETE  /auth/*path                         controllers.GatewayController.proxyAuth(path)
+
+GET     /catalog/*path                      controllers.GatewayController.proxyCatalog(path)
+POST    /catalog/*path                      controllers.GatewayController.proxyCatalog(path)
+PUT     /catalog/*path                      controllers.GatewayController.proxyCatalog(path)
+DELETE  /catalog/*path                      controllers.GatewayController.proxyCatalog(path)
+
+GET     /inventory/*path                    controllers.GatewayController.proxyInventory(path)
+POST    /inventory/*path                    controllers.GatewayController.proxyInventory(path)
+PUT     /inventory/*path                    controllers.GatewayController.proxyInventory(path)
+DELETE  /inventory/*path                    controllers.GatewayController.proxyInventory(path)
+
+GET     /purchase/*path                     controllers.GatewayController.proxyPurchase(path)
+POST    /purchase/*path                     controllers.GatewayController.proxyPurchase(path)
+PUT     /purchase/*path                     controllers.GatewayController.proxyPurchase(path)
+DELETE  /purchase/*path                     controllers.GatewayController.proxyPurchase(path)
+
+GET     /sales/*path                        controllers.GatewayController.proxySales(path)
+POST    /sales/*path                        controllers.GatewayController.proxySales(path)
+PUT     /sales/*path                        controllers.GatewayController.proxySales(path)
+DELETE  /sales/*path                        controllers.GatewayController.proxySales(path)
+
+GET     /report/*path                       controllers.GatewayController.proxyReport(path)
+POST    /report/*path                       controllers.GatewayController.proxyReport(path)
+PUT     /report/*path                       controllers.GatewayController.proxyReport(path)
+DELETE  /report/*path                       controllers.GatewayController.proxyReport(path)
+
+# ============================================================================
 # HEALTH CHECK ENDPOINTS (Đợt 6)
 # ============================================================================
 # Dùng cho monitoring API Gateway

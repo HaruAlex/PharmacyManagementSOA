@@ -8,6 +8,7 @@ import javax.inject.Singleton;
 import java.time.Instant;
 import java.sql.Connection;
 import play.db.Database;
+import com.ecwid.consul.v1.ConsulClient;
 
 /**
  * Controller xử lý Health Check cho Consul
@@ -21,10 +22,12 @@ import play.db.Database;
 public class HealthController extends Controller {
     
     private final Database database;
+    private final ConsulClient consulClient;
     
     @Inject
-    public HealthController(Database database) {
+    public HealthController(Database database, ConsulClient consulClient) {
         this.database = database;
+        this.consulClient = consulClient;
     }
     
     /**
@@ -43,6 +46,7 @@ public class HealthController extends Controller {
             if (dbHealthy) {
                 response.put("status", "healthy");
                 response.put("service", "sales-service");
+                response.put("instance", System.getProperty("service.instance.id", "sales-1"));
                 response.put("timestamp", Instant.now().toString());
                 return ok(response);
             } else {
