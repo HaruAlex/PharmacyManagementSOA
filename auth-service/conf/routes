@@ -5,32 +5,48 @@
 # ============================================================================
 # HEALTH CHECK ENDPOINTS
 # ============================================================================
-# Dùng cho Consul health check và monitoring
 GET     /health                             controllers.HealthController.health()
 GET     /health/detailed                    controllers.HealthController.detailedHealth()
 
 # ============================================================================
-# AUTHENTICATION & AUTHORIZATION ENDPOINTS
+# AUTHENTICATION ENDPOINTS (Phase 2 & 3)
 # ============================================================================
-# TODO: Implement các endpoint này
-
-# POST    /api/v1/auth/login                  controllers.AuthController.login()
-# POST    /api/v1/auth/refresh                controllers.AuthController.refreshToken()
-# POST    /api/v1/auth/logout                 controllers.AuthController.logout()
-# GET     /api/v1/auth/me                     controllers.AuthController.getCurrentUser()
++nocsrf
+POST    /api/auth/login                     controllers.AuthController.login(request: Request)
++nocsrf
+POST    /api/auth/refresh                   controllers.AuthController.refresh(request: Request)
++nocsrf
+POST    /api/auth/logout                    controllers.AuthController.logout(request: Request)
++nocsrf
+POST    /api/auth/logout-all                controllers.AuthController.logoutAll(request: Request)
+GET     /api/auth/validate                  controllers.AuthController.validate(request: Request)
+GET     /api/auth/me                        controllers.AuthController.me(request: Request)
++nocsrf
+PUT     /api/auth/current-branch            controllers.AuthController.selectBranch(request: Request)
 
 # ============================================================================
-# USER MANAGEMENT ENDPOINTS
+# USER MANAGEMENT ENDPOINTS (Phase 4 - Admin only)
 # ============================================================================
-# TODO: Implement các endpoint này
-
-# GET     /api/v1/auth/users                  controllers.UserController.listUsers()
-# POST    /api/v1/auth/users                  controllers.UserController.createUser()
-# GET     /api/v1/auth/users/:id              controllers.UserController.getUser(id: Long)
-# PUT     /api/v1/auth/users/:id              controllers.UserController.updateUser(id: Long)
++nocsrf
+POST    /api/users                          controllers.UserController.create(request: Request)
+GET     /api/users                          controllers.UserController.list(request: Request)
+GET     /api/users/:id                      controllers.UserController.get(id: Integer, request: Request)
++nocsrf
+PUT     /api/users/:id                      controllers.UserController.update(id: Integer, request: Request)
++nocsrf
+PUT     /api/users/:id/role-branches        controllers.UserController.updateRoleBranches(id: Integer, request: Request)
++nocsrf
+POST    /api/users/:id/lock                 controllers.UserController.lock(id: Integer, request: Request)
++nocsrf
+POST    /api/users/:id/unlock               controllers.UserController.unlock(id: Integer, request: Request)
++nocsrf
+DELETE  /api/users/:id                      controllers.UserController.delete(id: Integer, request: Request)
++nocsrf
+POST    /api/users/:id/activate             controllers.UserController.activate(id: Integer, request: Request)
++nocsrf
+POST    /api/users/:id/reset-password       controllers.UserController.resetPassword(id: Integer, request: Request)
 
 # ============================================================================
 # STATIC ASSETS
 # ============================================================================
-# Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file                       controllers.Assets.versioned(path="/public", file: Asset)
