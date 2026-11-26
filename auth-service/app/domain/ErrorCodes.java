@@ -53,6 +53,7 @@ public final class ErrorCodes {
     public static final String VALIDATION_FAILED = "VALIDATION_FAILED";
     public static final String FORBIDDEN = "FORBIDDEN";
     public static final String INTERNAL_ERROR = "INTERNAL_ERROR";
+    public static final String RATE_LIMIT_EXCEEDED = "RATE_LIMIT_EXCEEDED";
     
     private ErrorCodes() {}
 }

@@ -3,7 +3,7 @@ package domain;
 import java.time.Instant;
 
 /**
- * Entity User - Người dùng hệ thống
+ * Thực thể User - Người dùng hệ thống
  */
 public class User {
     private Integer userId;

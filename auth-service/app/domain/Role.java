@@ -1,7 +1,7 @@
 package domain;
 
 /**
- * Entity Role - Vai trò người dùng trong hệ thống
+ * Thực thể Role - Vai trò người dùng trong hệ thống
  */
 public class Role {
     private Integer roleId;

@@ -3,7 +3,7 @@ package dto;
 import javax.validation.constraints.*;
 
 /**
- * Request DTO để admin reset mật khẩu user
+ * Đối tượng dữ liệu yêu cầu Admin đặt lại mật khẩu người dùng
  */
 public class ResetPasswordRequest {
     @NotBlank(message = "New password is required")

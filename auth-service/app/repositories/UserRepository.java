@@ -37,4 +37,9 @@ public interface UserRepository {
      * Đếm số Admin còn active và không bị locked
      */
     long countActiveAdmins();
+    
+    /**
+     * Lấy danh sách userId thuộc role
+     */
+    List<Integer> getUserIdsByRoleId(Integer roleId);
 }

@@ -32,21 +32,30 @@
 - Library: `at.favre.lib:bcrypt:0.10.2`
 
 ### Branch Lookup Client
-- Phase 1 sử dụng `FakeBranchLookupClient` (in-memory)
-- Giả lập 3 branches: ID 1,2,3 (CN000, CN001, CN002)
-- Phase sau sẽ implement `HttpBranchLookupClient` gọi Catalog Service qua Play WS
+- Dev/Test sử dụng `FakeBranchLookupClient` (in-memory), giả lập các branch ID 1, 2, 3 (CN000, CN001, CN002).
+- Production sử dụng `HttpBranchLookupClient` qua Play WS, gọi `GET {catalog.service.baseUrl}{catalog.service.activeBranchesPath}`; path mặc định là `/api/branches/active`.
+- Contract response là JSON có trường `branchIds` dạng mảng số nguyên, ví dụ `{"branchIds":[1,2,3]}`. Danh sách chỉ chứa branches đang active.
+- HTTP status ngoài 2xx, response sai định dạng hoặc lỗi kết nối sẽ làm thao tác cần tra cứu thất bại rõ ràng; Auth Service không fallback sang fake trong Production.
+- Catalog Service hiện chưa có route này. Cần triển khai endpoint theo contract trên ở Catalog trước khi xác nhận tích hợp Production.
+- Tạo user và gán role/branches yêu cầu danh sách branch không rỗng, không trùng và mọi ID phải active. Khi cấp role `AD`, danh sách phải khớp toàn bộ active branch IDs.
+- Chọn current branch kiểm tra cả quyền trong `auth.UserBranches` lẫn trạng thái active từ Catalog.
 
 ### Admin Role Branches
-- Admin được gán TẤT CẢ branches đang active trong hệ thống
-- Khi tạo/cập nhật admin, cần đảm bảo có ít nhất 1 branch
+- Admin được gán TẤT CẢ branches đang active trong hệ thống; không chỉ kiểm tra danh sách có ít nhất một branch.
 
 ### AuditLog Details Truncation
 - Maximum length: 1000 ký tự (theo schema)
 - Nếu details vượt quá → cắt bớt an toàn (không throw exception)
 
 ### Clock Injection
-- Inject `java.time.Clock` để có thể mock trong test
-- Production sử dụng `Clock.systemUTC()`
+- `java.time.Clock` được inject vào JWT issuer/verifier và các service cần kiểm soát thời gian để hỗ trợ clock giả trong test.
+- Production sử dụng `Clock.systemUTC()`.
+
+### Rate Limit
+- `/api/auth/login`: tối đa 10 yêu cầu trên mỗi username/IP trong 15 phút; giới hạn theo IP là 100 yêu cầu trong cùng thời gian.
+- `/api/auth/refresh`: tối đa 10 yêu cầu trên mỗi refresh token/IP và 30 yêu cầu trên mỗi IP trong 1 phút. Giới hạn IP giúp chặn việc né giới hạn bằng refresh token đã rotate.
+- `/api/auth/change-password`: tối đa 10 yêu cầu trên mỗi user/IP trong 15 phút; giới hạn theo IP là 100 yêu cầu trong cùng thời gian.
+- Các bộ đếm dùng Caffeine trong bộ nhớ của từng Auth Service instance; khóa được băm trước khi lưu. Đây không phải shared rate limit giữa nhiều instance.
 
 ### Error Handling
 - SQL Exception code 2627/2601 = Unique constraint violation → xử lý riêng cho username/email trùng
@@ -66,9 +75,9 @@
 ## Decisions Log
 
 ### 2024 - Phase 1
-- **Decision**: Sử dụng Fake Branch Client thay vì HTTP client ngay từ đầu
-  - **Reason**: Giảm dependency vào Catalog Service, test dễ hơn
-  - **Impact**: Cần implement HTTP client ở phase sau
+- **Decision**: Giữ Fake Branch Client cho Dev/Test và dùng HTTP Branch Client trong Production
+  - **Reason**: Dev/Test không phụ thuộc Catalog Service; Production tra cứu trạng thái branch thật
+  - **Impact**: Catalog Service phải cung cấp endpoint theo contract đã ghi ở trên
 
 - **Decision**: Seeder chạy eager singleton, không phải manual trigger
   - **Reason**: Đơn giản hóa setup, dev chỉ cần start app là có tài khoản test

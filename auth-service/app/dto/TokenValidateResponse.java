@@ -3,7 +3,7 @@ package dto;
 import java.util.List;
 
 /**
- * Response DTO cho /api/auth/validate (introspection)
+ * Đối tượng dữ liệu phản hồi cho /api/auth/validate (kiểm tra trạng thái token)
  */
 public class TokenValidateResponse {
     private boolean active;

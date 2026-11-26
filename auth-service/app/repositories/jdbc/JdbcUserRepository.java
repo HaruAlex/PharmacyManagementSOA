@@ -101,7 +101,7 @@ public class JdbcUserRepository implements UserRepository {
 
     @Override
     public boolean existsUsername(String username) {
-        String sql = "SELECT COUNT(*) FROM auth.Users WHERE Username = ? COLLATE Latin1_General_CI_AS";
+        String sql = "SELECT COUNT(*) FROM auth.Users WHERE Username = ? COLLATE Latin1_General_CI_AS AND IsActive = 1";
         return database.withConnection(conn -> {
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, username.trim());
@@ -120,7 +120,7 @@ public class JdbcUserRepository implements UserRepository {
         if (email == null || email.trim().isEmpty()) {
             return false;
         }
-        String sql = "SELECT COUNT(*) FROM auth.Users WHERE Email = ? COLLATE Latin1_General_CI_AS";
+        String sql = "SELECT COUNT(*) FROM auth.Users WHERE Email = ? COLLATE Latin1_General_CI_AS AND IsActive = 1";
         return database.withConnection(conn -> {
             try (PreparedStatement ps = conn.prepareStatement(sql)) {
                 ps.setString(1, email.trim());
@@ -168,7 +168,7 @@ public class JdbcUserRepository implements UserRepository {
             params.add(isLocked ? 1 : 0);
         }
 
-        // Validate và thêm ORDER BY
+        // Kiểm tra và thêm ORDER BY
         String validSortBy = SORT_WHITELIST.contains(sortBy) ? sortBy : "UserId";
         String validSortOrder = "DESC".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
         sql.append(" ORDER BY ").append(validSortBy).append(" ").append(validSortOrder);
@@ -356,6 +356,23 @@ public class JdbcUserRepository implements UserRepository {
                     return rs.getLong(1);
                 }
                 return 0L;
+            }
+        });
+    }
+
+    @Override
+    public List<Integer> getUserIdsByRoleId(Integer roleId) {
+        String sql = "SELECT UserId FROM auth.Users WHERE RoleId = ?";
+        return database.withConnection(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, roleId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<Integer> userIds = new ArrayList<>();
+                    while (rs.next()) {
+                        userIds.add(rs.getInt("UserId"));
+                    }
+                    return userIds;
+                }
             }
         });
     }

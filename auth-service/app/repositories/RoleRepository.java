@@ -22,4 +22,14 @@ public interface RoleRepository {
      * Kiểm tra role có đang được sử dụng bởi user active không
      */
     boolean isInUseByActiveUsers(Integer roleId);
+    
+    /**
+     * Đếm số user active thuộc role
+     */
+    long countActiveUsersByRole(Integer roleId);
+    
+    /**
+     * Lấy danh sách userId thuộc role
+     */
+    List<Integer> getUserIdsByRoleId(Integer roleId);
 }

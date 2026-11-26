@@ -1,7 +1,7 @@
 package dto;
 
 /**
- * Response DTO cho refresh token
+ * Đối tượng dữ liệu phản hồi làm mới token
  */
 public class RefreshTokenResponse {
     private String accessToken;

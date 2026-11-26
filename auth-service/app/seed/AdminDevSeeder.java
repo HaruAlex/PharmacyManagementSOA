@@ -60,11 +60,16 @@ public class AdminDevSeeder {
      * Chạy seed nếu điều kiện thỏa mãn
      */
     private void seed() {
-        // Chỉ chạy khi NOT production hoặc có cấu hình enableDevAdmin=true
-        boolean shouldSeed = !environment.isProd() || config.getBoolean("seed.enableDevAdmin");
-        
-        if (!shouldSeed) {
+        if (environment.isProd()) {
             System.out.println("[AdminDevSeeder] Skipping seeder in Production mode");
+            return;
+        }
+
+        boolean shouldSeed = environment.mode() == Mode.DEV
+                || environment.mode() == Mode.TEST
+                || (config.hasPath("seed.enableDevAdmin") && config.getBoolean("seed.enableDevAdmin"));
+        if (!shouldSeed) {
+            System.out.println("[AdminDevSeeder] Dev seeding is disabled");
             return;
         }
         
@@ -147,28 +152,23 @@ public class AdminDevSeeder {
             if (existingUser.isPresent()) {
                 User user = existingUser.get();
                 
-                // Chỉ cập nhật nếu password hash là placeholder hoặc rỗng
+                // Chỉ cập nhật mật khẩu cấu hình nếu cơ sở dữ liệu còn dùng hash giữ chỗ.
                 if (PLACEHOLDER_HASH.equals(user.getPasswordHash()) || 
                     user.getPasswordHash() == null || 
                     user.getPasswordHash().trim().isEmpty()) {
-                    
-                    String hashedPassword = passwordHasher.hash(password);
-                    userRepository.updatePasswordHash(user.getUserId(), hashedPassword);
-                    
-                    // Đảm bảo user được unlock và active
-                    if (user.isLocked() || !user.isActive() || user.getFailedLoginCount() > 0) {
-                        userRepository.setLocked(user.getUserId(), false);
-                        userRepository.setActive(user.getUserId(), true);
-                        userRepository.resetFailedLogin(user.getUserId());
-                    }
-                    
-                    // Cập nhật branches
-                    userBranchRepository.replaceBranches(user.getUserId(), branchIds);
-                    
-                    System.out.println("[AdminDevSeeder] Updated existing user: " + username);
-                } else {
-                    System.out.println("[AdminDevSeeder] User already exists with valid password: " + username);
+                    userRepository.updatePasswordHash(user.getUserId(), passwordHasher.hash(password));
                 }
+
+                // Tài khoản demo là dữ liệu kiểm thử cố định; trạng thái khóa, vai trò và
+                // chi nhánh được khôi phục khi khởi động lại sau các lần kiểm thử.
+                user.setRoleId(role.getRoleId());
+                userRepository.update(user);
+                userRepository.setLocked(user.getUserId(), false);
+                userRepository.setActive(user.getUserId(), true);
+                userRepository.resetFailedLogin(user.getUserId());
+                userBranchRepository.replaceBranches(user.getUserId(), branchIds);
+
+                System.out.println("[AdminDevSeeder] Refreshed demo account state: " + username);
                 
             } else {
                 // Tạo user mới

@@ -56,7 +56,7 @@ public class AdminDevSeederTest {
     @Test
     void seeder_shouldNotRunInProduction() {
         // Arrange
-        Config config = ConfigFactory.parseString("seed.enableDevAdmin=false");
+        Config config = ConfigFactory.parseString("seed.enableDevAdmin=true");
         when(environment.isProd()).thenReturn(true);
         
         // Act
@@ -74,8 +74,8 @@ public class AdminDevSeederTest {
         Config config = ConfigFactory.parseString(
             "seed.enableDevAdmin=true\n" +
             "seed.admin.username=admin.demo\n" +
-            "seed.admin.email=admin@example.local\n" +
-            "seed.admin.password=Admin@12345"
+            "seed.admin.email=\"admin@example.local\"\n" +
+            "seed.admin.password=\"Admin@12345\""
         );
         when(environment.isProd()).thenReturn(false);
         
@@ -99,8 +99,8 @@ public class AdminDevSeederTest {
         Config config = ConfigFactory.parseString(
             "seed.enableDevAdmin=true\n" +
             "seed.admin.username=admin.demo\n" +
-            "seed.admin.email=admin@example.local\n" +
-            "seed.admin.password=Admin@12345"
+            "seed.admin.email=\"admin@example.local\"\n" +
+            "seed.admin.password=\"Admin@12345\""
         );
         when(environment.isProd()).thenReturn(false);
         
@@ -126,13 +126,13 @@ public class AdminDevSeederTest {
     }
 
     @Test
-    void seeder_shouldNotUpdateUserWithValidHash() {
+    void seeder_shouldPreserveValidPasswordAndResetLockedDemoUserState() {
         // Arrange
         Config config = ConfigFactory.parseString(
             "seed.enableDevAdmin=true\n" +
             "seed.admin.username=admin.demo\n" +
-            "seed.admin.email=admin@example.local\n" +
-            "seed.admin.password=Admin@12345"
+            "seed.admin.email=\"admin@example.local\"\n" +
+            "seed.admin.password=\"Admin@12345\""
         );
         when(environment.isProd()).thenReturn(false);
         
@@ -143,8 +143,9 @@ public class AdminDevSeederTest {
         existingUser.setUserId(1);
         existingUser.setUsername("admin.demo");
         existingUser.setPasswordHash("$2a$11$validhashfromproduction");
-        existingUser.setLocked(false);
-        existingUser.setActive(true);
+        existingUser.setLocked(true);
+        existingUser.setFailedLoginCount(5);
+        existingUser.setActive(false);
         
         when(userRepository.getByUsername("admin.demo")).thenReturn(Optional.of(existingUser));
         
@@ -152,8 +153,12 @@ public class AdminDevSeederTest {
         new AdminDevSeeder(userRepository, roleRepository, userBranchRepository,
                           branchLookupClient, passwordHasher, config, environment);
         
-        // Assert - không update password
+        // Assert - preserve valid credentials but restore deterministic demo state.
         verify(userRepository, never()).updatePasswordHash(anyInt(), anyString());
+        verify(userRepository).setLocked(1, false);
+        verify(userRepository).setActive(1, true);
+        verify(userRepository).resetFailedLogin(1);
+        verify(userBranchRepository).replaceBranches(eq(1), anyList());
     }
 
     @Test
@@ -162,8 +167,8 @@ public class AdminDevSeederTest {
         Config config = ConfigFactory.parseString(
             "seed.enableDevAdmin=true\n" +
             "seed.admin.username=admin.demo\n" +
-            "seed.admin.email=admin@example.local\n" +
-            "seed.admin.password=Admin@12345"
+            "seed.admin.email=\"admin@example.local\"\n" +
+            "seed.admin.password=\"Admin@12345\""
         );
         when(environment.isProd()).thenReturn(false);
         

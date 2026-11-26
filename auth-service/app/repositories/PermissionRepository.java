@@ -22,4 +22,9 @@ public interface PermissionRepository {
      * Kiểm tra permission có đang được gán cho role nào không
      */
     boolean isAssignedToAnyRole(Integer permissionId);
+    
+    /**
+     * Thay thế toàn bộ quyền của vai trò trong một giao dịch nguyên tử.
+     */
+    void replaceRolePermissions(Integer roleId, List<Integer> permissionIds);
 }

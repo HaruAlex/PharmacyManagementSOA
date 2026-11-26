@@ -2,7 +2,12 @@ package modules;
 
 import clients.BranchLookupClient;
 import clients.FakeBranchLookupClient;
+import clients.HttpBranchLookupClient;
 import com.google.inject.AbstractModule;
+import com.google.inject.Provides;
+import com.typesafe.config.Config;
+import play.Environment;
+import play.libs.ws.WSClient;
 import repositories.*;
 import repositories.jdbc.*;
 import security.BCryptPasswordHasher;
@@ -20,14 +25,14 @@ import java.time.Clock;
 public class AuthModule extends AbstractModule {
     @Override
     protected void configure() {
-        // Clock - cho phép mock trong test
+        // Clock - cho phép kiểm soát thời gian trong kiểm thử
         bind(Clock.class).toInstance(Clock.systemUTC());
         
-        // Security
+        // Bảo mật
         bind(PasswordHasher.class).to(BCryptPasswordHasher.class);
         bind(TokenService.class).to(JwtTokenService.class);
         
-        // Repositories
+        // Các repository
         bind(UserRepository.class).to(JdbcUserRepository.class);
         bind(RoleRepository.class).to(JdbcRoleRepository.class);
         bind(PermissionRepository.class).to(JdbcPermissionRepository.class);
@@ -36,11 +41,19 @@ public class AuthModule extends AbstractModule {
         bind(RefreshTokenRepository.class).to(JdbcRefreshTokenRepository.class);
         bind(AuditLogRepository.class).to(JdbcAuditLogRepository.class);
         
-        // Clients - sử dụng Fake client cho dev/test
-        // TODO: Phase sau sẽ thêm HTTP client thật và chọn dựa vào config
-        bind(BranchLookupClient.class).to(FakeBranchLookupClient.class);
-        
-        // Seeder - eager singleton để chạy ngay khi app start
+        // Seeder - khởi tạo sớm khi ứng dụng khởi động
         bind(AdminDevSeeder.class).asEagerSingleton();
+    }
+
+    @Provides
+    @javax.inject.Singleton
+    BranchLookupClient provideBranchLookupClient(
+            WSClient wsClient,
+            Config config,
+            Environment environment) {
+        if (environment.isProd()) {
+            return new HttpBranchLookupClient(wsClient, config);
+        }
+        return new FakeBranchLookupClient();
     }
 }

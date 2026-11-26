@@ -1,5 +1,6 @@
 package services;
 
+import clients.BranchLookupClient;
 import com.typesafe.config.Config;
 import domain.*;
 import dto.*;
@@ -14,8 +15,11 @@ import javax.inject.Singleton;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -27,12 +31,13 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final UserBranchRepository userBranchRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final AuditLogRepository auditLogRepository;
     private final PasswordHasher passwordHasher;
     private final UserStatusCache userStatusCache;
     private final RefreshTokenService refreshTokenService;
+    private final AuditService auditService;
     private final Database database;
     private final Clock clock;
+    private final BranchLookupClient branchLookupClient;
     
     // Password policy từ config
     private final int passwordMinLength;
@@ -47,23 +52,25 @@ public class UserService {
             RoleRepository roleRepository,
             UserBranchRepository userBranchRepository,
             RefreshTokenRepository refreshTokenRepository,
-            AuditLogRepository auditLogRepository,
             PasswordHasher passwordHasher,
             UserStatusCache userStatusCache,
             RefreshTokenService refreshTokenService,
+            AuditService auditService,
             Database database,
             Clock clock,
+            BranchLookupClient branchLookupClient,
             Config config) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.userBranchRepository = userBranchRepository;
         this.refreshTokenRepository = refreshTokenRepository;
-        this.auditLogRepository = auditLogRepository;
         this.passwordHasher = passwordHasher;
         this.userStatusCache = userStatusCache;
         this.refreshTokenService = refreshTokenService;
+        this.auditService = auditService;
         this.database = database;
         this.clock = clock;
+        this.branchLookupClient = branchLookupClient;
         
         this.passwordMinLength = config.getInt("password.policy.minLength");
         this.passwordRequireUppercase = config.getBoolean("password.policy.requireUppercase");
@@ -76,7 +83,7 @@ public class UserService {
      * Tạo user mới (chỉ Admin)
      */
     public UserResponse createUser(CreateUserRequest request, Integer adminUserId, String ipAddress) {
-        // Validate password policy
+        // Kiểm tra chính sách mật khẩu
         validatePassword(request.getPassword());
         
         // Kiểm tra username đã tồn tại (case-insensitive)
@@ -105,7 +112,7 @@ public class UserService {
                 "Role is inactive");
         }
         
-        // TODO: Kiểm tra branches hợp lệ qua BranchLookupClient (Phase 4 skip for now)
+        List<Integer> branchIds = validateBranchIds(role, request.getBranchIds());
         
         Instant now = clock.instant();
         
@@ -143,15 +150,15 @@ public class UserService {
             user.setUserId(userId);
             
             // Gán branches
-            userBranchRepository.replaceBranches(userId, request.getBranchIds());
+            userBranchRepository.replaceBranches(userId, branchIds);
             
             // Ghi audit log
-            writeAudit(adminUserId, null, AuditActions.USER_CREATED, "User", userId.longValue(),
+            auditService.write(adminUserId, null, AuditActions.USER_CREATED, "User", userId.longValue(),
                 String.format("User %s created with role %s, IP: %s", 
                     user.getUsername(), role.getRoleCode(), ipAddress));
             
             // Trả về response
-            return buildUserResponse(user, role, request.getBranchIds());
+            return buildUserResponse(user, role, branchIds);
         });
     }
 
@@ -168,7 +175,7 @@ public class UserService {
             String sortBy,
             String sortOrder) {
         
-        // Validate page size (tối đa 100)
+        // Kiểm tra kích thước trang (tối đa 100)
         if (pageSize > 100) {
             pageSize = 100;
         }
@@ -179,18 +186,28 @@ public class UserService {
             page = 1;
         }
         
-        // Validate sort field (whitelist)
-        List<String> allowedSortFields = List.of("userId", "username", "fullName", "email", "createdAt", "updatedAt");
-        if (sortBy == null || !allowedSortFields.contains(sortBy)) {
-            sortBy = "createdAt";
+        // Kiểm tra trường sắp xếp theo danh sách cho phép và ánh xạ sang tên cột
+        String sortColumn;
+        if (sortBy == null) {
+            sortColumn = "CreatedAt";
+        } else {
+            sortColumn = switch (sortBy.toLowerCase()) {
+                case "userid" -> "UserId";
+                case "username" -> "Username";
+                case "fullname" -> "FullName";
+                case "email" -> "Email";
+                case "createdat" -> "CreatedAt";
+                case "updatedat" -> "UpdatedAt";
+                default -> "CreatedAt";
+            };
         }
         
-        // Validate sort order
+        // Kiểm tra chiều sắp xếp
         if (!"ASC".equalsIgnoreCase(sortOrder) && !"DESC".equalsIgnoreCase(sortOrder)) {
             sortOrder = "DESC";
         }
         
-        // Parse status filter
+        // Đọc bộ lọc trạng thái
         Boolean isActive = null;
         Boolean isLocked = null;
         if (status != null) {
@@ -211,13 +228,13 @@ public class UserService {
         // Search users
         List<User> users = userRepository.search(
             name, email, roleId, isActive, isLocked,
-            page, pageSize, sortBy, sortOrder
+            page, pageSize, sortColumn, sortOrder
         );
         
         // Count total
         long totalItems = userRepository.count(name, email, roleId, isActive, isLocked);
         
-        // Build response
+        // Tạo response
         List<UserResponse> userResponses = users.stream().map(user -> {
             Role role = roleRepository.getById(user.getRoleId()).orElse(null);
             List<Integer> branchIds = userBranchRepository.getBranchIdsByUserId(user.getUserId());
@@ -264,6 +281,11 @@ public class UserService {
         if (!role.isActive()) {
             throw ApiException.badRequest(ErrorCodes.ROLE_INACTIVE, "Role is inactive");
         }
+
+        List<Integer> branchIds = userBranchRepository.getBranchIdsByUserId(userId);
+        if (!Objects.equals(user.getRoleId(), request.getRoleId())) {
+            branchIds = validateBranchIds(role, branchIds);
+        }
         
         // Cập nhật user
         user.setFullName(request.getFullName().trim());
@@ -275,15 +297,14 @@ public class UserService {
         userRepository.update(user);
         
         // Ghi audit
-        writeAudit(adminUserId, null, AuditActions.USER_UPDATED, "User", userId.longValue(),
+        auditService.write(adminUserId, null, AuditActions.USER_UPDATED, "User", userId.longValue(),
             String.format("User %s updated, IP: %s", user.getUsername(), ipAddress));
         
-        List<Integer> branchIds = userBranchRepository.getBranchIdsByUserId(userId);
         return buildUserResponse(user, role, branchIds);
     }
 
     /**
-     * Gán role + branches cho user (revoke tokens, clear cache)
+     * Gán role và chi nhánh cho người dùng, đồng thời thu hồi token và xóa cache
      */
     public UserResponse updateRoleAndBranches(Integer userId, UpdateRoleBranchesRequest request, 
                                               Integer adminUserId, String ipAddress) {
@@ -298,17 +319,17 @@ public class UserService {
             throw ApiException.badRequest(ErrorCodes.ROLE_INACTIVE, "Role is inactive");
         }
         
-        // TODO: Validate branches qua BranchLookupClient
+        List<Integer> branchIds = validateBranchIds(role, request.getBranchIds());
         
         // Cập nhật trong transaction
         return database.withTransaction(conn -> {
-            // Update role
+            // Cập nhật vai trò
             user.setRoleId(request.getRoleId());
             user.setUpdatedAt(clock.instant());
             userRepository.update(user);
             
-            // Replace branches
-            userBranchRepository.replaceBranches(userId, request.getBranchIds());
+            // Thay thế danh sách chi nhánh
+            userBranchRepository.replaceBranches(userId, branchIds);
             
             // Revoke all refresh tokens
             refreshTokenRepository.revokeAllByUserId(userId);
@@ -317,14 +338,44 @@ public class UserService {
             userStatusCache.evict(userId);
             
             // Audit
-            writeAudit(adminUserId, null, AuditActions.USER_ROLE_CHANGED, "User", userId.longValue(),
+            auditService.write(adminUserId, null, AuditActions.USER_ROLE_CHANGED, "User", userId.longValue(),
                 String.format("User %s role changed to %s, IP: %s", user.getUsername(), role.getRoleCode(), ipAddress));
             
-            writeAudit(adminUserId, null, AuditActions.USER_BRANCHES_CHANGED, "User", userId.longValue(),
+            auditService.write(adminUserId, null, AuditActions.USER_BRANCHES_CHANGED, "User", userId.longValue(),
                 String.format("User %s branches changed, IP: %s", user.getUsername(), ipAddress));
             
-            return buildUserResponse(user, role, request.getBranchIds());
+            return buildUserResponse(user, role, branchIds);
         });
+    }
+
+    private List<Integer> validateBranchIds(Role role, List<Integer> branchIds) {
+        if (branchIds == null || branchIds.isEmpty()
+                || branchIds.stream().anyMatch(java.util.Objects::isNull)) {
+            throw ApiException.badRequest(ErrorCodes.VALIDATION_FAILED,
+                    "At least one valid branch ID is required");
+        }
+        Set<Integer> requestedIds = new HashSet<>(branchIds);
+        if (requestedIds.size() != branchIds.size()) {
+            throw ApiException.badRequest(ErrorCodes.VALIDATION_FAILED,
+                    "Branch IDs must not contain duplicates");
+        }
+
+        List<Integer> activeBranchIds = branchLookupClient.getAllActiveBranchIds()
+                .toCompletableFuture()
+                .join();
+        if (activeBranchIds == null) {
+            throw new IllegalStateException("Branch lookup returned no active branch list");
+        }
+        Set<Integer> activeIds = new HashSet<>(activeBranchIds);
+        if (!activeIds.containsAll(requestedIds)) {
+            throw ApiException.badRequest(ErrorCodes.BRANCH_INACTIVE,
+                    "One or more branches do not exist or are inactive");
+        }
+        if ("AD".equals(role.getRoleCode()) && !activeIds.equals(requestedIds)) {
+            throw ApiException.badRequest(ErrorCodes.BRANCH_NOT_ACCESSIBLE,
+                    "Admin must be assigned all active branches");
+        }
+        return List.copyOf(branchIds);
     }
 
     /**
@@ -360,7 +411,7 @@ public class UserService {
         userStatusCache.evict(userId);
         
         // Audit
-        writeAudit(adminUserId, null, AuditActions.USER_LOCKED, "User", userId.longValue(),
+        auditService.write(adminUserId, null, AuditActions.USER_LOCKED, "User", userId.longValue(),
             String.format("User %s locked by admin, IP: %s", user.getUsername(), ipAddress));
     }
 
@@ -381,7 +432,7 @@ public class UserService {
         userStatusCache.evict(userId);
         
         // Audit
-        writeAudit(adminUserId, null, AuditActions.USER_UNLOCKED, "User", userId.longValue(),
+        auditService.write(adminUserId, null, AuditActions.USER_UNLOCKED, "User", userId.longValue(),
             String.format("User %s unlocked by admin, IP: %s", user.getUsername(), ipAddress));
     }
 
@@ -418,7 +469,7 @@ public class UserService {
         userStatusCache.evict(userId);
         
         // Audit
-        writeAudit(adminUserId, null, AuditActions.USER_DELETED, "User", userId.longValue(),
+        auditService.write(adminUserId, null, AuditActions.USER_DELETED, "User", userId.longValue(),
             String.format("User %s soft-deleted by admin, IP: %s", user.getUsername(), ipAddress));
     }
 
@@ -436,7 +487,7 @@ public class UserService {
         userStatusCache.evict(userId);
         
         // Audit
-        writeAudit(adminUserId, null, AuditActions.USER_ACTIVATED, "User", userId.longValue(),
+        auditService.write(adminUserId, null, AuditActions.USER_ACTIVATED, "User", userId.longValue(),
             String.format("User %s activated by admin, IP: %s", user.getUsername(), ipAddress));
     }
 
@@ -444,13 +495,13 @@ public class UserService {
      * Reset mật khẩu user (admin)
      */
     public void resetPassword(Integer userId, String newPassword, Integer adminUserId, String ipAddress) {
-        // Validate password policy
+        // Kiểm tra chính sách mật khẩu
         validatePassword(newPassword);
         
         User user = userRepository.getById(userId)
             .orElseThrow(() -> ApiException.notFound(ErrorCodes.USER_NOT_FOUND, "User not found"));
         
-        // Update password hash
+        // Cập nhật hash mật khẩu
         String newHash = passwordHasher.hash(newPassword);
         userRepository.updatePasswordHash(userId, newHash);
         
@@ -461,12 +512,12 @@ public class UserService {
         userStatusCache.evict(userId);
         
         // Audit (không ghi mật khẩu)
-        writeAudit(adminUserId, null, AuditActions.PASSWORD_RESET, "User", userId.longValue(),
+        auditService.write(adminUserId, null, AuditActions.PASSWORD_RESET, "User", userId.longValue(),
             String.format("Password reset for user %s by admin, IP: %s", user.getUsername(), ipAddress));
     }
 
     /**
-     * Validate password policy
+     * Kiểm tra chính sách mật khẩu
      */
     private void validatePassword(String password) {
         if (password == null || password.length() < passwordMinLength) {
@@ -496,7 +547,7 @@ public class UserService {
     }
 
     /**
-     * Build UserResponse từ User entity
+     * Tạo UserResponse từ thực thể User
      */
     private UserResponse buildUserResponse(User user, Role role, List<Integer> branchIds) {
         UserResponse response = new UserResponse();
@@ -517,23 +568,4 @@ public class UserService {
         return response;
     }
 
-    /**
-     * Ghi audit log
-     */
-    private void writeAudit(Integer userId, Integer branchId, String actionCode, String entityName, Long entityId, String details) {
-        try {
-            AuditLog log = new AuditLog();
-            log.setUserId(userId);
-            log.setBranchId(branchId);
-            log.setActionCode(actionCode);
-            log.setEntityName(entityName);
-            log.setEntityId(entityId);
-            log.setDetails(details.length() > 1000 ? details.substring(0, 1000) : details);
-            log.setCreatedAt(clock.instant());
-            
-            auditLogRepository.write(log);
-        } catch (Exception e) {
-            System.err.println("Failed to write audit log: " + e.getMessage());
-        }
-    }
 }

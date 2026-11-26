@@ -4,7 +4,7 @@ import javax.validation.constraints.*;
 import java.util.List;
 
 /**
- * Request DTO để tạo user mới
+ * Đối tượng dữ liệu yêu cầu tạo người dùng mới
  */
 public class CreateUserRequest {
     @NotBlank(message = "Full name is required")

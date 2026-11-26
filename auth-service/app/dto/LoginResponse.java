@@ -3,7 +3,7 @@ package dto;
 import java.util.List;
 
 /**
- * Response DTO cho login thành công
+ * Đối tượng dữ liệu phản hồi khi đăng nhập thành công
  */
 public class LoginResponse {
     private String accessToken;

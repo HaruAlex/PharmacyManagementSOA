@@ -7,7 +7,7 @@ import java.util.Base64;
 import javax.inject.Singleton;
 
 /**
- * Generator cho refresh token
+ * Bộ tạo refresh token
  * - Sinh chuỗi ngẫu nhiên 64 bytes
  * - Hash bằng SHA-256 để lưu vào DB
  */

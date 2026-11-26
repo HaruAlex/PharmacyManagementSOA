@@ -8,13 +8,16 @@ import play.libs.Json;
 import play.mvc.Http;
 import play.mvc.Result;
 import play.mvc.Results;
+import security.TokenInvalidException;
 
 import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutionException;
 
 /**
- * Global error handler - RFC 7807 Problem Details format
+ * Bộ xử lý lỗi toàn cục theo định dạng RFC 7807 Problem Details
  */
 @Singleton
 public class ErrorHandler implements HttpErrorHandler {
@@ -34,9 +37,11 @@ public class ErrorHandler implements HttpErrorHandler {
     
     @Override
     public CompletionStage<Result> onServerError(Http.RequestHeader request, Throwable exception) {
+        Throwable cause = unwrap(exception);
+
         // ApiException - lỗi nghiệp vụ có cấu trúc
-        if (exception instanceof ApiException) {
-            ApiException apiEx = (ApiException) exception;
+        if (cause instanceof ApiException) {
+            ApiException apiEx = (ApiException) cause;
             return CompletableFuture.completedFuture(
                 Results.status(apiEx.getStatus(), createProblemDetails(
                     apiEx.getStatus(),
@@ -46,14 +51,27 @@ public class ErrorHandler implements HttpErrorHandler {
                 ))
             );
         }
+
+        if (cause instanceof TokenInvalidException) {
+            ApiException apiException = ApiException.unauthorized(
+                    ErrorCodes.AUTH_TOKEN_INVALID, "Invalid or expired token");
+            return CompletableFuture.completedFuture(
+                Results.status(apiException.getStatus(), createProblemDetails(
+                    apiException.getStatus(),
+                    apiException.getCode(),
+                    apiException.getMessage(),
+                    request.path()
+                ))
+            );
+        }
         
-        // IllegalArgumentException - validation error
-        if (exception instanceof IllegalArgumentException) {
+        // IllegalArgumentException - lỗi xác thực dữ liệu
+        if (cause instanceof IllegalArgumentException) {
             return CompletableFuture.completedFuture(
                 Results.badRequest(createProblemDetails(
                     Http.Status.BAD_REQUEST,
                     ErrorCodes.VALIDATION_FAILED,
-                    exception.getMessage(),
+                    cause.getMessage(),
                     request.path()
                 ))
             );
@@ -61,7 +79,7 @@ public class ErrorHandler implements HttpErrorHandler {
         
         // Lỗi không xác định - 500 Internal Server Error
         // Không expose chi tiết lỗi ra ngoài
-        exception.printStackTrace();
+        cause.printStackTrace();
         
         return CompletableFuture.completedFuture(
             Results.internalServerError(createProblemDetails(
@@ -71,6 +89,15 @@ public class ErrorHandler implements HttpErrorHandler {
                 request.path()
             ))
         );
+    }
+
+    private Throwable unwrap(Throwable exception) {
+        Throwable cause = exception;
+        while ((cause instanceof CompletionException || cause instanceof ExecutionException)
+                && cause.getCause() != null) {
+            cause = cause.getCause();
+        }
+        return cause;
     }
     
     /**

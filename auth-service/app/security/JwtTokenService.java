@@ -12,6 +12,7 @@ import play.Environment;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -27,12 +28,13 @@ public class JwtTokenService implements TokenService {
     private final JWTVerifier verifier;
     private final int accessTokenMinutes;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @Inject
-    public JwtTokenService(Config config, Environment environment) {
+    public JwtTokenService(Config config, Environment environment, Clock clock) {
         String secret = config.getString("jwt.secret");
         
-        // Production: bắt buộc phải có JWT_SECRET và >= 32 bytes
+        // Môi trường production bắt buộc có JWT_SECRET dài ít nhất 32 byte
         if (environment.isProd()) {
             if (secret == null || secret.length() < 32) {
                 throw new RuntimeException(
@@ -48,14 +50,15 @@ public class JwtTokenService implements TokenService {
         }
         
         this.algorithm = Algorithm.HMAC256(secret);
-        this.verifier = JWT.require(algorithm).build();
+        this.verifier = ((JWTVerifier.BaseVerification) JWT.require(algorithm)).build(clock);
         this.accessTokenMinutes = config.getInt("jwt.accessTokenMinutes");
         this.objectMapper = new ObjectMapper();
+        this.clock = clock;
     }
 
     @Override
     public String createAccessToken(Integer userId, String roleCode, List<Integer> branchIds, Integer currentBranchId) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         Instant expiry = now.plus(accessTokenMinutes, ChronoUnit.MINUTES);
         
         var builder = JWT.create()
@@ -81,7 +84,7 @@ public class JwtTokenService implements TokenService {
             Integer userId = Integer.parseInt(jwt.getSubject());
             String roleCode = jwt.getClaim("role").asString();
             
-            // Parse branch_ids từ claim
+            // Đọc branch_ids từ claim
             List<Integer> branchIds = jwt.getClaim("branch_ids").asList(Integer.class);
             
             Integer currentBranchId = null;

@@ -1,6 +1,9 @@
 package controllers;
 
+import actions.RateLimited;
+import clients.BranchLookupClient;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.typesafe.config.Config;
 import dto.LoginRequest;
 import dto.LoginResponse;
@@ -21,6 +24,7 @@ import repositories.*;
 import security.TokenService;
 import security.UserStatusCache;
 import services.AuthService;
+import services.AuditService;
 import services.RefreshTokenService;
 
 import javax.inject.Inject;
@@ -41,11 +45,12 @@ public class AuthController extends Controller {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final UserBranchRepository userBranchRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditService auditService;
     private final TokenService tokenService;
     private final UserStatusCache userStatusCache;
     private final ClassLoaderExecutionContext dbContext;
     private final int accessTokenMinutes;
+    private final BranchLookupClient branchLookupClient;
 
     @Inject
     public AuthController(
@@ -55,31 +60,34 @@ public class AuthController extends Controller {
             RoleRepository roleRepository,
             PermissionRepository permissionRepository,
             UserBranchRepository userBranchRepository,
-            AuditLogRepository auditLogRepository,
+            AuditService auditService,
             TokenService tokenService,
             UserStatusCache userStatusCache,
             ClassLoaderExecutionContext dbContext,
-            Config config) {
+            Config config,
+            BranchLookupClient branchLookupClient) {
         this.authService = authService;
         this.refreshTokenService = refreshTokenService;
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.userBranchRepository = userBranchRepository;
-        this.auditLogRepository = auditLogRepository;
+        this.auditService = auditService;
         this.tokenService = tokenService;
         this.userStatusCache = userStatusCache;
         this.dbContext = dbContext;
         this.accessTokenMinutes = config.getInt("jwt.accessTokenMinutes");
+        this.branchLookupClient = branchLookupClient;
     }
 
     /**
      * POST /api/auth/login
      * Đăng nhập bằng username hoặc email
      */
+    @RateLimited(RateLimited.Policy.LOGIN)
     public CompletionStage<Result> login(Http.Request request) {
         return CompletableFuture.supplyAsync(() -> {
-            // Parse request body
+            // Đọc dữ liệu từ phần thân yêu cầu
             JsonNode json = request.body().asJson();
             if (json == null) {
                 throw ApiException.badRequest("VALIDATION_FAILED", "Request body is required");
@@ -97,7 +105,7 @@ public class AuthController extends Controller {
             // Lấy IP và User-Agent
             String ipAddress = request.remoteAddress();
             String userAgent = request.header("User-Agent").orElse("Unknown");
-            
+        
             // Thực hiện login
             LoginResponse response = authService.login(
                 loginReq.getUsernameOrEmail(),
@@ -153,7 +161,7 @@ public class AuthController extends Controller {
                 throw ApiException.unauthorized("AUTH_TOKEN_INVALID", "Missing or invalid authorization header");
             }
             
-            // Verify token và trạng thái
+            // Xác thực token và trạng thái
             TokenService.TokenPayload payload = authService.verifyAndCheckStatus(token);
             
             // Lấy thông tin user
@@ -188,7 +196,7 @@ public class AuthController extends Controller {
     }
 
     /**
-     * Extract Bearer token từ Authorization header
+     * Trích xuất Bearer token từ header Authorization
      */
     private String extractToken(Http.Request request) {
         return request.header("Authorization")
@@ -202,95 +210,110 @@ public class AuthController extends Controller {
      * Refresh access token (rotation)
      * Không yêu cầu access token - chỉ cần refresh token
      */
+    @RateLimited(RateLimited.Policy.REFRESH)
     public CompletionStage<Result> refresh(Http.Request request) {
         return CompletableFuture.supplyAsync(() -> {
-            JsonNode json = request.body().asJson();
-            if (json == null) {
-                throw ApiException.badRequest("VALIDATION_FAILED", "Request body is required");
+            try {
+                JsonNode json = request.body().asJson();
+                if (json == null) {
+                    throw ApiException.badRequest("VALIDATION_FAILED", "Request body is required");
+                }
+                
+                dto.RefreshTokenRequest refreshReq = Json.fromJson(json, dto.RefreshTokenRequest.class);
+                if (refreshReq.getRefreshToken() == null || refreshReq.getRefreshToken().isBlank()) {
+                    throw ApiException.badRequest("VALIDATION_FAILED", "Refresh token is required");
+                }
+                
+                String ipAddress = request.remoteAddress();
+                
+                // Lấy userId từ refresh token hash
+                String tokenHash = security.RefreshTokenGenerator.hashToken(refreshReq.getRefreshToken());
+                Optional<domain.RefreshToken> tokenOpt = refreshTokenService.getByTokenHash(tokenHash);
+                if (tokenOpt.isEmpty()) {
+                    throw ApiException.unauthorized(domain.ErrorCodes.AUTH_REFRESH_INVALID, "Invalid refresh token");
+                }
+                
+                Integer userId = tokenOpt.get().getUserId();
+                
+                // Xoay vòng refresh token; phương thức này đồng thời xác thực token
+                String newRefreshToken = refreshTokenService.rotateRefreshToken(
+                    userId,
+                    refreshReq.getRefreshToken(),
+                    ipAddress
+                );
+                
+                // Lấy thông tin user mới nhất (role, branches có thể đã thay đổi)
+                var user = userRepository.getById(userId)
+                    .orElseThrow(() -> ApiException.unauthorized("AUTH_TOKEN_REVOKED", "User not found"));
+                
+                var role = roleRepository.getById(user.getRoleId())
+                    .orElseThrow(() -> ApiException.unauthorized("AUTH_TOKEN_REVOKED", "Role not found"));
+                
+                var branchIds = userBranchRepository.getBranchIdsByUserId(user.getUserId());
+                
+                // Không có current_branch_id (user phải chọn lại)
+                Integer currentBranchId = null;
+                
+                // Tạo access token mới
+                String newAccessToken = tokenService.createAccessToken(
+                    user.getUserId(),
+                    role.getRoleCode(),
+                    branchIds,
+                    currentBranchId
+                );
+                
+                dto.RefreshTokenResponse response = new dto.RefreshTokenResponse(
+                    newAccessToken,
+                    accessTokenMinutes * 60,
+                    newRefreshToken
+                );
+                
+                return ok(Json.toJson(response));
+            } catch (ApiException e) {
+                ObjectNode error = play.libs.Json.newObject();
+                error.put("status", e.getStatus());
+                error.put("code", e.getCode());
+                error.put("message", e.getMessage());
+                return status(e.getStatus(), error);
             }
-            
-            dto.RefreshTokenRequest refreshReq = Json.fromJson(json, dto.RefreshTokenRequest.class);
-            if (refreshReq.getRefreshToken() == null || refreshReq.getRefreshToken().isBlank()) {
-                throw ApiException.badRequest("VALIDATION_FAILED", "Refresh token is required");
-            }
-            
-            String ipAddress = request.remoteAddress();
-            
-            // Lấy userId từ refresh token hash
-            String tokenHash = security.RefreshTokenGenerator.hashToken(refreshReq.getRefreshToken());
-            Optional<domain.RefreshToken> tokenOpt = refreshTokenService.getByTokenHash(tokenHash);
-            if (tokenOpt.isEmpty()) {
-                throw ApiException.unauthorized(domain.ErrorCodes.AUTH_REFRESH_INVALID, "Invalid refresh token");
-            }
-            
-            Integer userId = tokenOpt.get().getUserId();
-            
-            // Rotate refresh token (sẽ validate token trong method này)
-            String newRefreshToken = refreshTokenService.rotateRefreshToken(
-                userId,
-                refreshReq.getRefreshToken(),
-                ipAddress
-            );
-            
-            // Lấy thông tin user mới nhất (role, branches có thể đã thay đổi)
-            var user = userRepository.getById(userId)
-                .orElseThrow(() -> ApiException.unauthorized("AUTH_TOKEN_REVOKED", "User not found"));
-            
-            var role = roleRepository.getById(user.getRoleId())
-                .orElseThrow(() -> ApiException.unauthorized("AUTH_TOKEN_REVOKED", "Role not found"));
-            
-            var branchIds = userBranchRepository.getBranchIdsByUserId(user.getUserId());
-            
-            // Không có current_branch_id (user phải chọn lại)
-            Integer currentBranchId = null;
-            
-            // Tạo access token mới
-            String newAccessToken = tokenService.createAccessToken(
-                user.getUserId(),
-                role.getRoleCode(),
-                branchIds,
-                currentBranchId
-            );
-            
-            dto.RefreshTokenResponse response = new dto.RefreshTokenResponse(
-                newAccessToken,
-                accessTokenMinutes * 60,
-                newRefreshToken
-            );
-            
-            return ok(Json.toJson(response));
-            
         }, dbContext.current());
     }
 
     /**
      * POST /api/auth/logout
-     * Logout - revoke refresh token
+     * Đăng xuất và thu hồi refresh token
      */
     public CompletionStage<Result> logout(Http.Request request) {
         return CompletableFuture.supplyAsync(() -> {
-            JsonNode json = request.body().asJson();
-            if (json == null) {
-                throw ApiException.badRequest("VALIDATION_FAILED", "Request body is required");
+            try {
+                JsonNode json = request.body().asJson();
+                if (json == null) {
+                    throw ApiException.badRequest("VALIDATION_FAILED", "Request body is required");
+                }
+                
+                dto.RefreshTokenRequest logoutReq = Json.fromJson(json, dto.RefreshTokenRequest.class);
+                if (logoutReq.getRefreshToken() == null || logoutReq.getRefreshToken().isBlank()) {
+                    throw ApiException.badRequest("VALIDATION_FAILED", "Refresh token is required");
+                }
+                
+                String token = extractToken(request);
+                if (token == null) {
+                    throw ApiException.unauthorized("AUTH_TOKEN_INVALID", "Missing or invalid authorization header");
+                }
+                
+                TokenService.TokenPayload payload = authService.verifyAndCheckStatus(token);
+                String ipAddress = request.remoteAddress();
+                
+                refreshTokenService.revokeToken(logoutReq.getRefreshToken(), payload.getUserId(), ipAddress);
+                
+                return ok(Json.toJson(java.util.Map.of("message", "Logged out successfully")));
+            } catch (ApiException e) {
+                ObjectNode error = play.libs.Json.newObject();
+                error.put("status", e.getStatus());
+                error.put("code", e.getCode());
+                error.put("message", e.getMessage());
+                return status(e.getStatus(), error);
             }
-            
-            dto.RefreshTokenRequest logoutReq = Json.fromJson(json, dto.RefreshTokenRequest.class);
-            if (logoutReq.getRefreshToken() == null || logoutReq.getRefreshToken().isBlank()) {
-                throw ApiException.badRequest("VALIDATION_FAILED", "Refresh token is required");
-            }
-            
-            String token = extractToken(request);
-            if (token == null) {
-                throw ApiException.unauthorized("AUTH_TOKEN_INVALID", "Missing or invalid authorization header");
-            }
-            
-            TokenService.TokenPayload payload = authService.verifyAndCheckStatus(token);
-            String ipAddress = request.remoteAddress();
-            
-            refreshTokenService.revokeToken(logoutReq.getRefreshToken(), payload.getUserId(), ipAddress);
-            
-            return ok(Json.toJson(java.util.Map.of("message", "Logged out successfully")));
-            
         }, dbContext.current());
     }
 
@@ -326,69 +349,100 @@ public class AuthController extends Controller {
         return CompletableFuture.supplyAsync(() -> {
             String token = extractToken(request);
             if (token == null) {
-                throw ApiException.unauthorized("AUTH_TOKEN_INVALID", "Missing or invalid authorization header");
+                throw ApiException.unauthorized(
+                        "AUTH_TOKEN_INVALID", "Missing or invalid authorization header");
             }
-            
+
             TokenService.TokenPayload payload = authService.verifyAndCheckStatus(token);
-            
             JsonNode json = request.body().asJson();
             if (json == null) {
                 throw ApiException.badRequest("VALIDATION_FAILED", "Request body is required");
             }
-            
-            dto.SelectBranchRequest branchReq = Json.fromJson(json, dto.SelectBranchRequest.class);
-            if (branchReq.getBranchId() == null) {
+
+            SelectBranchRequest branchRequest = Json.fromJson(json, SelectBranchRequest.class);
+            if (branchRequest == null || branchRequest.getBranchId() == null) {
                 throw ApiException.badRequest("VALIDATION_FAILED", "Branch ID is required");
             }
-            
-            // Kiểm tra branch có trong danh sách của user không
+
             var branchIds = userBranchRepository.getBranchIdsByUserId(payload.getUserId());
-            if (!branchIds.contains(branchReq.getBranchId())) {
-                throw ApiException.forbidden(domain.ErrorCodes.BRANCH_NOT_ACCESSIBLE, 
-                    "You do not have access to this branch");
+            if (!branchIds.contains(branchRequest.getBranchId())) {
+                throw ApiException.forbidden(
+                        domain.ErrorCodes.BRANCH_NOT_ACCESSIBLE,
+                        "You do not have access to this branch");
             }
-            
-            // TODO Phase 3: Kiểm tra branch còn active qua BranchLookupClient
-            // boolean isActive = branchLookupClient.isBranchActive(branchReq.getBranchId()).toCompletableFuture().join();
-            // if (!isActive) throw ApiException.badRequest(ErrorCodes.BRANCH_INACTIVE, "Branch is inactive");
-            
-            // Lấy thông tin user
+
             var user = userRepository.getById(payload.getUserId())
-                .orElseThrow(() -> ApiException.unauthorized("AUTH_TOKEN_REVOKED", "User not found"));
-            
+                    .orElseThrow(() -> ApiException.unauthorized(
+                            "AUTH_TOKEN_REVOKED", "User not found"));
             var role = roleRepository.getById(user.getRoleId())
-                .orElseThrow(() -> ApiException.unauthorized("AUTH_TOKEN_REVOKED", "Role not found"));
-            
-            // Phát hành access token mới với current_branch_id
-            String newAccessToken = tokenService.createAccessToken(
-                user.getUserId(),
-                role.getRoleCode(),
-                branchIds,
-                branchReq.getBranchId()
-            );
-            
-            // Ghi audit log
-            try {
-                domain.AuditLog auditLog = new domain.AuditLog();
-                auditLog.setUserId(user.getUserId());
-                auditLog.setBranchId(branchReq.getBranchId());
-                auditLog.setActionCode(domain.AuditActions.BRANCH_SELECTED);
-                auditLog.setEntityName("Branch");
-                auditLog.setEntityId(branchReq.getBranchId().longValue());
-                auditLog.setDetails(String.format("Branch %d selected, IP: %s", branchReq.getBranchId(), request.remoteAddress()));
-                auditLogRepository.write(auditLog);
-            } catch (Exception e) {
-                // Ignore audit error
-            }
-            
-            dto.RefreshTokenResponse response = new dto.RefreshTokenResponse(
-                newAccessToken,
-                accessTokenMinutes * 60,
-                null // Không cần refresh token mới
-            );
-            
-            return ok(Json.toJson(response));
-            
-        }, dbContext.current());
+                    .orElseThrow(() -> ApiException.unauthorized(
+                            "AUTH_TOKEN_REVOKED", "Role not found"));
+
+            return new BranchSelection(user, role, branchIds, branchRequest.getBranchId());
+        }, dbContext.current()).thenCompose(selection ->
+                branchLookupClient.isBranchActive(selection.branchId)
+                        .thenApplyAsync(isActive -> {
+                            if (!Boolean.TRUE.equals(isActive)) {
+                                throw ApiException.badRequest(
+                                        domain.ErrorCodes.BRANCH_INACTIVE,
+                                        "Branch is inactive or does not exist");
+                            }
+
+                            String newAccessToken = tokenService.createAccessToken(
+                                    selection.user.getUserId(),
+                                    selection.role.getRoleCode(),
+                                    selection.branchIds,
+                                    selection.branchId);
+                            auditService.write(
+                                    selection.user.getUserId(),
+                                    selection.branchId,
+                                    domain.AuditActions.BRANCH_SELECTED,
+                                    "Branch",
+                                    selection.branchId.longValue(),
+                                    String.format(
+                                            "Branch %d selected, IP: %s",
+                                            selection.branchId,
+                                            request.remoteAddress()));
+
+                            dto.RefreshTokenResponse response = new dto.RefreshTokenResponse(
+                                    newAccessToken,
+                                    accessTokenMinutes * 60,
+                                    null);
+                            return ok(Json.toJson(response));
+                        }, dbContext.current()))
+                .exceptionally(error -> {
+                    Throwable cause = error;
+                    while (cause instanceof java.util.concurrent.CompletionException
+                            && cause.getCause() != null) {
+                        cause = cause.getCause();
+                    }
+                    if (cause instanceof ApiException) {
+                        ApiException apiException = (ApiException) cause;
+                        ObjectNode errorResponse = Json.newObject();
+                        errorResponse.put("status", apiException.getStatus());
+                        errorResponse.put("code", apiException.getCode());
+                        errorResponse.put("message", apiException.getMessage());
+                        return status(apiException.getStatus(), errorResponse);
+                    }
+                    throw new java.util.concurrent.CompletionException(cause);
+                });
+    }
+
+    private static final class BranchSelection {
+        private final domain.User user;
+        private final domain.Role role;
+        private final java.util.List<Integer> branchIds;
+        private final Integer branchId;
+
+        private BranchSelection(
+                domain.User user,
+                domain.Role role,
+                java.util.List<Integer> branchIds,
+                Integer branchId) {
+            this.user = user;
+            this.role = role;
+            this.branchIds = branchIds;
+            this.branchId = branchId;
+        }
     }
 }

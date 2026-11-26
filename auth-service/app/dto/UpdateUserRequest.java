@@ -3,7 +3,7 @@ package dto;
 import javax.validation.constraints.*;
 
 /**
- * Request DTO để cập nhật user (không được đổi username)
+ * Đối tượng dữ liệu yêu cầu cập nhật người dùng (không được đổi username)
  */
 public class UpdateUserRequest {
     @NotBlank(message = "Full name is required")

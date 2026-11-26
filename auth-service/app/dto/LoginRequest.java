@@ -3,7 +3,7 @@ package dto;
 import javax.validation.constraints.NotBlank;
 
 /**
- * Request DTO cho login
+ * Đối tượng dữ liệu yêu cầu đăng nhập
  */
 public class LoginRequest {
     @NotBlank(message = "Username or email is required")

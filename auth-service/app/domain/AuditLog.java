@@ -3,7 +3,7 @@ package domain;
 import java.time.Instant;
 
 /**
- * Entity AuditLog - Nhật ký kiểm toán hệ thống
+ * Thực thể AuditLog - Nhật ký kiểm toán hệ thống
  */
 public class AuditLog {
     private Long auditLogId;

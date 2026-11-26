@@ -1,10 +1,10 @@
+﻿# ============================================================================
+# KỊCH BẢN KIỂM THỬ PHASE 4 - Quản lý người dùng (chỉ Admin)
 # ============================================================================
-# PHASE 4 TEST SCRIPT - User Management (Admin only)
-# ============================================================================
-# Test CRUD users, lock/unlock, soft delete, reset password
+# Kiểm thử CRUD người dùng, khóa/mở khóa, xóa mềm và đặt lại mật khẩu
 #
 # Yeu cau:
-# - Service dang chay tren http://localhost:9001
+# - Dịch vụ đang chạy tại http://localhost:9001
 # - Database da co du lieu seed
 # - Admin account: admin.demo / Admin@12345
 #
@@ -34,7 +34,7 @@ function Write-TestResult($success, $message) {
 }
 
 # ============================================================================
-# SETUP: Login as admin to get token
+# CHUẨN BỊ: Admin đăng nhập để lấy token
 # ============================================================================
 Write-TestHeader "SETUP: Login as admin"
 
@@ -45,7 +45,6 @@ try {
         -Body '{"usernameOrEmail":"admin.demo","password":"Admin@12345"}'
     
     $adminToken = $loginResponse.accessToken
-    Write-Host "Admin Token: $($adminToken.Substring(0, 50))..." -ForegroundColor Cyan
     Write-TestResult $true "Admin login thanh cong"
 } catch {
     Write-TestResult $false "Admin login that bai: $($_.Exception.Message)"
@@ -57,11 +56,16 @@ try {
 # ============================================================================
 Write-TestHeader "TEST 1: Tao user moi thanh cong"
 
+# Tao username unique voi timestamp
+$timestamp = Get-Date -Format "HHmmss"
+$testUsername = "testphase4_$timestamp"
+$testEmail = "testphase4_$timestamp@example.com"
+
 $newUser = @{
     fullName = "Test User Phase 4"
-    username = "testphase4"
+    username = $testUsername
     password = "Test@12345"
-    email = "testphase4@example.com"
+    email = $testEmail
     phone = "0123456789"
     roleId = 3
     branchIds = @(2)
@@ -77,7 +81,7 @@ try {
     Write-Host "Created User ID: $($createResponse.userId)" -ForegroundColor Yellow
     $script:testUserId = $createResponse.userId
     
-    if ($createResponse.username -eq "testphase4" -and 
+    if ($createResponse.username -eq $testUsername -and 
         $createResponse.fullName -eq "Test User Phase 4" -and
         $createResponse.isActive -eq $true -and
         $createResponse.isLocked -eq $false) {
@@ -96,7 +100,7 @@ Write-TestHeader "TEST 2: Tao user trung username - 409 Conflict"
 
 $duplicateUser = @{
     fullName = "Duplicate User"
-    username = "testphase4"
+    username = $testUsername
     password = "Test@12345"
     email = "another@example.com"
     phone = "0987654321"
@@ -199,7 +203,7 @@ try {
         -Headers @{"Authorization" = "Bearer $adminToken"}
     
     if ($detailResponse.userId -eq $testUserId -and 
-        $detailResponse.username -eq "testphase4") {
+        $detailResponse.username -eq $testUsername) {
         Write-TestResult $true "Get user detail thanh cong"
     } else {
         Write-TestResult $false "User detail khong dung"
@@ -229,7 +233,7 @@ try {
     
     if ($updateResponse.fullName -eq "Test User Updated" -and
         $updateResponse.email -eq "testupdated@example.com" -and
-        $updateResponse.username -eq "testphase4") {
+        $updateResponse.username -eq $testUsername) {
         Write-TestResult $true "Cap nhat user thanh cong (username khong doi)"
     } else {
         Write-TestResult $false "Cap nhat user khong dung"
@@ -461,7 +465,7 @@ try {
 Write-TestHeader "TEST 17: Non-admin user goi API - 403 Forbidden"
 
 try {
-    # Login as pharmacist (role SP, not AD)
+    # Đăng nhập bằng pharmacist (vai trò SP, không phải AD)
     $pharmacistLogin = Invoke-RestMethod -Uri "$baseUrl/api/auth/login" `
         -Method POST `
         -ContentType "application/json" `
@@ -469,7 +473,7 @@ try {
     
     $pharmacistToken = $pharmacistLogin.accessToken
     
-    # Try to list users
+    # Thử lấy danh sách người dùng
     $nonAdminResponse = Invoke-RestMethod -Uri "$baseUrl/api/users?page=1&pageSize=10" `
         -Method GET `
         -Headers @{"Authorization" = "Bearer $pharmacistToken"}

@@ -162,6 +162,39 @@ public class JdbcRoleRepository implements RoleRepository {
         });
     }
 
+    @Override
+    public long countActiveUsersByRole(Integer roleId) {
+        String sql = "SELECT COUNT(*) FROM auth.Users WHERE RoleId = ? AND IsActive = 1";
+        return database.withConnection(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, roleId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        return rs.getLong(1);
+                    }
+                    return 0L;
+                }
+            }
+        });
+    }
+
+    @Override
+    public List<Integer> getUserIdsByRoleId(Integer roleId) {
+        String sql = "SELECT UserId FROM auth.Users WHERE RoleId = ?";
+        return database.withConnection(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setInt(1, roleId);
+                try (ResultSet rs = ps.executeQuery()) {
+                    List<Integer> userIds = new ArrayList<>();
+                    while (rs.next()) {
+                        userIds.add(rs.getInt("UserId"));
+                    }
+                    return userIds;
+                }
+            }
+        });
+    }
+
     private Role mapRole(ResultSet rs) throws SQLException {
         Role role = new Role();
         role.setRoleId(rs.getInt("RoleId"));

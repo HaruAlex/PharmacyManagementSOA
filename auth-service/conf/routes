@@ -25,6 +25,40 @@ GET     /api/auth/me                        controllers.AuthController.me(reques
 PUT     /api/auth/current-branch            controllers.AuthController.selectBranch(request: Request)
 
 # ============================================================================
+# PROFILE ENDPOINTS (Phase 5 - User self-service)
+# ============================================================================
+GET     /api/auth/profile                   controllers.ProfileController.getProfile(request: Request)
++nocsrf
+PUT     /api/auth/profile                   controllers.ProfileController.updateProfile(request: Request)
++nocsrf
+PUT     /api/auth/change-password           controllers.ProfileController.changePassword(request: Request)
+
+# ============================================================================
+# RBAC ENDPOINTS (Phase 6 - Admin only)
+# ============================================================================
+# Roles
+GET     /api/roles                          controllers.RoleController.list(request: Request)
++nocsrf
+POST    /api/roles                          controllers.RoleController.create(request: Request)
+GET     /api/roles/:id                      controllers.RoleController.get(id: Integer, request: Request)
++nocsrf
+PUT     /api/roles/:id                      controllers.RoleController.update(id: Integer, request: Request)
+GET     /api/roles/:id/permissions          controllers.RoleController.getPermissions(id: Integer, request: Request)
++nocsrf
+PUT     /api/roles/:id/permissions          controllers.RoleController.updatePermissions(id: Integer, request: Request)
+
+# Permissions
+GET     /api/permissions                    controllers.PermissionController.list(request: Request)
++nocsrf
+POST    /api/permissions                    controllers.PermissionController.create(request: Request)
+GET     /api/permissions/:id                controllers.PermissionController.get(id: Integer, request: Request)
++nocsrf
+PUT     /api/permissions/:id                controllers.PermissionController.update(id: Integer, request: Request)
+
+# Audit Logs
+GET     /api/audit-logs                     controllers.AuditLogController.search(request: Request)
+
+# ============================================================================
 # USER MANAGEMENT ENDPOINTS (Phase 4 - Admin only)
 # ============================================================================
 +nocsrf

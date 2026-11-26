@@ -1,10 +1,10 @@
-# ============================================================================
-# PHASE 2 TEST SCRIPT - Auth Service
+﻿# ============================================================================
+# KỊCH BẢN KIỂM THỬ PHASE 2 - Auth Service
 # ============================================================================
 # Test đăng nhập, JWT, khóa tài khoản tự động
 #
 # Yêu cầu:
-# - Service đang chạy trên http://localhost:9001
+# - Dịch vụ đang chạy tại http://localhost:9001
 # - Database đã có dữ liệu seed
 # - AdminDevSeeder đã chạy (tài khoản admin.demo, warehouse.demo, pharmacist.demo)
 #
@@ -44,13 +44,9 @@ try {
         -ContentType "application/json" `
         -Body '{"usernameOrEmail":"admin.demo","password":"Admin@12345"}'
     
-    Write-Host "Response:" -ForegroundColor Yellow
-    $loginResponse | ConvertTo-Json -Depth 10
-    
     if ($loginResponse.accessToken -and $loginResponse.user.userId -eq 1) {
         Write-TestResult $true "Login với username thành công"
         $token = $loginResponse.accessToken
-        Write-Host "`nAccess Token: $token`n" -ForegroundColor Cyan
     } else {
         Write-TestResult $false "Login response thiếu thông tin"
     }
@@ -101,7 +97,7 @@ try {
 }
 
 # ============================================================================
-# TEST 4: GET /api/auth/validate - Token introspection
+# TEST 4: GET /api/auth/validate - Kiểm tra trạng thái token
 # ============================================================================
 Write-TestHeader "TEST 4: GET /api/auth/validate"
 
@@ -214,7 +210,7 @@ try {
 }
 
 # ============================================================================
-# TEST 8: Missing Authorization header
+# TEST 8: Thiếu header Authorization
 # ============================================================================
 Write-TestHeader "TEST 8: Thiếu Authorization header"
 
@@ -231,7 +227,7 @@ try {
 }
 
 # ============================================================================
-# TEST 9: Validate token không hợp lệ
+# TEST 9: Xác thực token không hợp lệ
 # ============================================================================
 Write-TestHeader "TEST 9: Validate token không hợp lệ"
 
@@ -246,7 +242,7 @@ try {
         Write-TestResult $false "Validate trả về active=true cho token không hợp lệ"
     }
 } catch {
-    # Validate endpoint không throw exception, trả về {active: false}
+    # Endpoint validate không ném ngoại lệ, trả về {active: false}
     Write-TestResult $false "Validate endpoint throw exception (không đúng thiết kế)"
 }
 
@@ -256,10 +252,10 @@ try {
 Write-TestHeader "TEST 10: Kiểm tra JWT token structure"
 
 try {
-    # Decode JWT token (base64)
+    # Giải mã JWT token (base64)
     $tokenParts = $token.Split('.')
     if ($tokenParts.Length -eq 3) {
-        # Decode payload (phần thứ 2)
+        # Giải mã payload (phần thứ hai)
         $payloadBase64 = $tokenParts[1]
         # Thêm padding nếu cần
         while ($payloadBase64.Length % 4 -ne 0) {
@@ -287,8 +283,28 @@ try {
 }
 
 # ============================================================================
-# SUMMARY
+# TỔNG KẾT
 # ============================================================================
+# Khôi phục tài khoản pharmacist.demo sau bài kiểm thử khóa tự động.
+try {
+    $users = Invoke-RestMethod -Uri "$baseUrl/api/users?name=pharmacist.demo&page=1&pageSize=100" `
+        -Method GET `
+        -Headers @{"Authorization" = "Bearer $token"}
+    $pharmacist = $users.items | Where-Object { $_.username -eq "pharmacist.demo" } | Select-Object -First 1
+    if ($pharmacist) {
+        Invoke-RestMethod -Uri "$baseUrl/api/users/$($pharmacist.userId)/unlock" `
+            -Method POST `
+            -Headers @{"Authorization" = "Bearer $token"} | Out-Null
+        Write-Host "Đã mở khóa pharmacist.demo sau kiểm thử." -ForegroundColor Gray
+    } else {
+        Write-Host "Không tìm thấy pharmacist.demo để khôi phục trạng thái." -ForegroundColor Yellow
+        $testsFailed++
+    }
+} catch {
+    Write-Host "Không thể khôi phục pharmacist.demo: $($_.Exception.Message)" -ForegroundColor Yellow
+    $testsFailed++
+}
+
 Write-Host "`n" -NoNewline
 Write-Host "============================================" -ForegroundColor Cyan
 Write-Host "  TEST SUMMARY - PHASE 2" -ForegroundColor Cyan

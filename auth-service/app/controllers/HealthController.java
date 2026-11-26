@@ -10,7 +10,7 @@ import java.time.Instant;
 import com.ecwid.consul.v1.ConsulClient;
 
 /**
- * Controller xử lý Health Check cho Consul và Database
+ * Bộ điều khiển kiểm tra trạng thái Consul và cơ sở dữ liệu
  * 
  * Endpoint: GET /health - Kiểm tra cho Consul (mỗi 10s)
  * Consul sẽ gọi endpoint này để kiểm tra service health
@@ -28,7 +28,7 @@ public class HealthController extends Controller {
     }
     
     /**
-     * Endpoint kiểm tra sức khỏe cơ bản cho Consul + Database
+     * Endpoint kiểm tra trạng thái cơ bản của Consul và cơ sở dữ liệu
      * 
      * @return HTTP 200 OK nếu service và database khỏe mạnh
      */
@@ -68,7 +68,7 @@ public class HealthController extends Controller {
         response.put("status", "healthy");
         response.put("service", "auth-service");
         
-        // Database health
+        // Trạng thái kết nối cơ sở dữ liệu
         response.put("database", checkDatabaseConnection() ? "connected" : "disconnected");
         
         // Memory metrics

@@ -3,7 +3,7 @@ package dto;
 import javax.validation.constraints.NotBlank;
 
 /**
- * Request DTO cho refresh token
+ * Đối tượng dữ liệu yêu cầu làm mới token
  */
 public class RefreshTokenRequest {
     @NotBlank(message = "Refresh token is required")

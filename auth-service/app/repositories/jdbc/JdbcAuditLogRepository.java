@@ -71,7 +71,7 @@ public class JdbcAuditLogRepository implements AuditLogRepository {
 
     @Override
     public List<AuditLog> search(Integer userId, String actionCode, String entityName,
-                                  Instant fromDate, Instant toDate, int page, int pageSize) {
+                                  Instant fromDate, Instant toDate, int page, int pageSize, String sortOrder) {
         StringBuilder sql = new StringBuilder("SELECT * FROM auth.AuditLogs WHERE 1=1");
         List<Object> params = new ArrayList<>();
 
@@ -100,7 +100,9 @@ public class JdbcAuditLogRepository implements AuditLogRepository {
             params.add(Timestamp.from(toDate));
         }
 
-        sql.append(" ORDER BY CreatedAt DESC");
+        // Sort order
+        String validSortOrder = "DESC".equalsIgnoreCase(sortOrder) ? "DESC" : "ASC";
+        sql.append(" ORDER BY CreatedAt ").append(validSortOrder);
 
         int offset = (page - 1) * pageSize;
         sql.append(" OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");
@@ -130,8 +132,8 @@ public class JdbcAuditLogRepository implements AuditLogRepository {
     }
 
     @Override
-    public long countSearch(Integer userId, String actionCode, String entityName,
-                           Instant fromDate, Instant toDate) {
+    public long count(Integer userId, String actionCode, String entityName,
+                      Instant fromDate, Instant toDate) {
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM auth.AuditLogs WHERE 1=1");
         List<Object> params = new ArrayList<>();
 

@@ -1,7 +1,7 @@
 package security;
 
 /**
- * Interface cho password hashing
+ * Giao diện băm mật khẩu
  */
 public interface PasswordHasher {
     /**
@@ -10,7 +10,7 @@ public interface PasswordHasher {
     String hash(String password);
     
     /**
-     * Verify password với hash
+     * Xác thực mật khẩu dựa trên hash
      */
     boolean verify(String password, String hash);
 }

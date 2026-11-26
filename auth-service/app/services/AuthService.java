@@ -11,9 +11,6 @@ import security.UserStatusCache;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -27,12 +24,11 @@ public class AuthService {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final UserBranchRepository userBranchRepository;
-    private final AuditLogRepository auditLogRepository;
     private final RefreshTokenService refreshTokenService;
+    private final AuditService auditService;
     private final PasswordHasher passwordHasher;
     private final TokenService tokenService;
     private final UserStatusCache userStatusCache;
-    private final Clock clock;
     private final Config config;
     
     private final int maxFailedAttempts;
@@ -44,23 +40,21 @@ public class AuthService {
             RoleRepository roleRepository,
             PermissionRepository permissionRepository,
             UserBranchRepository userBranchRepository,
-            AuditLogRepository auditLogRepository,
             RefreshTokenService refreshTokenService,
+            AuditService auditService,
             PasswordHasher passwordHasher,
             TokenService tokenService,
             UserStatusCache userStatusCache,
-            Clock clock,
             Config config) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.permissionRepository = permissionRepository;
         this.userBranchRepository = userBranchRepository;
-        this.auditLogRepository = auditLogRepository;
         this.refreshTokenService = refreshTokenService;
+        this.auditService = auditService;
         this.passwordHasher = passwordHasher;
         this.tokenService = tokenService;
         this.userStatusCache = userStatusCache;
-        this.clock = clock;
         this.config = config;
         
         this.maxFailedAttempts = config.getInt("auth.maxFailedAttempts");
@@ -85,7 +79,7 @@ public class AuthService {
             passwordHasher.verify("dummy-password-to-prevent-timing-attack", 
                 "$2a$11$dummyhashxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
             
-            writeAuditLog(null, null, AuditActions.LOGIN_FAILED, "User", null,
+            auditService.write(null, null, AuditActions.LOGIN_FAILED, "User", null,
                 String.format("Failed login attempt for: %s, IP: %s", usernameOrEmail, ipAddress));
             
             throw ApiException.unauthorized(ErrorCodes.AUTH_INVALID_CREDENTIALS, 
@@ -96,7 +90,7 @@ public class AuthService {
         
         // 2. Kiểm tra IsActive
         if (!user.isActive()) {
-            writeAuditLog(user.getUserId(), null, AuditActions.LOGIN_FAILED, "User", user.getUserId(),
+            auditService.write(user.getUserId(), null, AuditActions.LOGIN_FAILED, "User", user.getUserId().longValue(),
                 String.format("Inactive account login attempt, IP: %s", ipAddress));
             
             throw ApiException.unauthorized(ErrorCodes.AUTH_ACCOUNT_INACTIVE, 
@@ -105,7 +99,7 @@ public class AuthService {
         
         // 3. Kiểm tra IsLocked
         if (user.isLocked()) {
-            writeAuditLog(user.getUserId(), null, AuditActions.LOGIN_FAILED, "User", user.getUserId(),
+            auditService.write(user.getUserId(), null, AuditActions.LOGIN_FAILED, "User", user.getUserId().longValue(),
                 String.format("Locked account login attempt, IP: %s", ipAddress));
             
             throw ApiException.locked(ErrorCodes.AUTH_ACCOUNT_LOCKED, 
@@ -115,7 +109,7 @@ public class AuthService {
         // 4. Lấy role và kiểm tra IsActive
         Optional<Role> roleOpt = roleRepository.getById(user.getRoleId());
         if (roleOpt.isEmpty() || !roleOpt.get().isActive()) {
-            writeAuditLog(user.getUserId(), null, AuditActions.LOGIN_FAILED, "User", user.getUserId(),
+            auditService.write(user.getUserId(), null, AuditActions.LOGIN_FAILED, "User", user.getUserId().longValue(),
                 "Role not found or inactive");
             
             throw ApiException.unauthorized(ErrorCodes.AUTH_ROLE_INACTIVE, 
@@ -124,7 +118,7 @@ public class AuthService {
         
         Role role = roleOpt.get();
         
-        // 5. Verify password
+        // 5. Xác thực mật khẩu
         boolean passwordValid = passwordHasher.verify(password, user.getPasswordHash());
         
         if (!passwordValid) {
@@ -137,14 +131,14 @@ public class AuthService {
                 userRepository.setLocked(user.getUserId(), true);
                 userStatusCache.evict(user.getUserId());
                 
-                writeAuditLog(user.getUserId(), null, AuditActions.ACCOUNT_AUTO_LOCKED, "User", user.getUserId(),
+                auditService.write(user.getUserId(), null, AuditActions.ACCOUNT_AUTO_LOCKED, "User", user.getUserId().longValue(),
                     String.format("Account auto-locked after %d failed attempts, IP: %s", newFailedCount, ipAddress));
                 
                 throw ApiException.locked(ErrorCodes.AUTH_ACCOUNT_LOCKED, 
                     "Account is locked due to multiple failed login attempts. Please contact administrator.");
             }
             
-            writeAuditLog(user.getUserId(), null, AuditActions.LOGIN_FAILED, "User", user.getUserId(),
+            auditService.write(user.getUserId(), null, AuditActions.LOGIN_FAILED, "User", user.getUserId().longValue(),
                 String.format("Wrong password (attempt %d/%d), IP: %s", newFailedCount, maxFailedAttempts, ipAddress));
             
             throw ApiException.unauthorized(ErrorCodes.AUTH_INVALID_CREDENTIALS, 
@@ -181,10 +175,10 @@ public class AuthService {
         String refreshToken = refreshTokenService.createRefreshToken(user.getUserId(), ipAddress);
         
         // 12. Ghi audit log
-        writeAuditLog(user.getUserId(), currentBranchId, AuditActions.LOGIN_SUCCESS, "User", user.getUserId(),
+        auditService.write(user.getUserId(), currentBranchId, AuditActions.LOGIN_SUCCESS, "User", user.getUserId().longValue(),
             String.format("Successful login, IP: %s, User-Agent: %s", ipAddress, userAgent));
         
-        // 13. Build response
+        // 13. Tạo response
         LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo();
         userInfo.setUserId(user.getUserId());
         userInfo.setUsername(user.getUsername());
@@ -204,10 +198,10 @@ public class AuthService {
     }
     
     /**
-     * Verify token và kiểm tra trạng thái user
+     * Xác thực token và kiểm tra trạng thái người dùng
      */
     public TokenService.TokenPayload verifyAndCheckStatus(String token) {
-        // 1. Verify JWT signature và expiry
+        // 1. Xác thực chữ ký JWT và thời hạn
         TokenService.TokenPayload payload = tokenService.verifyToken(token);
         
         // 2. Kiểm tra trạng thái user qua cache
@@ -246,26 +240,4 @@ public class AuthService {
         return payload;
     }
     
-    /**
-     * Ghi audit log (không throw exception nếu lỗi)
-     */
-    private void writeAuditLog(Integer userId, Integer branchId, String actionCode, 
-                              String entityName, Integer entityId, String details) {
-        try {
-            AuditLog log = new AuditLog();
-            log.setUserId(userId);
-            log.setBranchId(branchId);
-            log.setActionCode(actionCode);
-            log.setEntityName(entityName);
-            log.setEntityId(entityId != null ? entityId.longValue() : null);
-            log.setDetails(details);
-            log.setCreatedAt(clock.instant());
-            
-            auditLogRepository.write(log);
-        } catch (Exception e) {
-            // Log error nhưng không fail request chính
-            System.err.println("Failed to write audit log: " + e.getMessage());
-            e.printStackTrace();
-        }
-    }
 }

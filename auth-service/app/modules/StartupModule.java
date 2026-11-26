@@ -11,7 +11,7 @@ import controllers.HealthController;
 public class StartupModule extends AbstractModule {
     @Override
     protected void configure() {
-        // Eager load - HealthController sẽ được tạo ngay khi app start
+        // Khởi tạo sớm để HealthController được tạo khi ứng dụng bắt đầu
         bind(ServiceInitializer.class).asEagerSingleton();
     }
     
@@ -19,7 +19,7 @@ public class StartupModule extends AbstractModule {
     public static class ServiceInitializer {
         @Inject
         public ServiceInitializer(ConsulClient consulClient, HealthController healthController) {
-            // Force initialization of both
+            // Buộc khởi tạo cả hai thành phần
             Logger.info("[ServiceInitializer] ConsulModule + HealthController initialized");
         }
     }

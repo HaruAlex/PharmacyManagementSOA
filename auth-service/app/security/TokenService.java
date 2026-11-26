@@ -3,7 +3,7 @@ package security;
 import java.util.List;
 
 /**
- * Interface cho JWT token service
+ * Giao diện dịch vụ JWT token
  */
 public interface TokenService {
     /**
@@ -17,7 +17,7 @@ public interface TokenService {
     String createAccessToken(Integer userId, String roleCode, List<Integer> branchIds, Integer currentBranchId);
     
     /**
-     * Verify và parse JWT token
+     * Xác thực và phân tích JWT token
      * @param token JWT token string
      * @return TokenPayload nếu hợp lệ
      * @throws TokenInvalidException nếu token không hợp lệ hoặc hết hạn

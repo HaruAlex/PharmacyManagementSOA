@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Response DTO cho thông tin user
+ * Đối tượng dữ liệu phản hồi thông tin người dùng
  */
 public class UserResponse {
     private Integer userId;

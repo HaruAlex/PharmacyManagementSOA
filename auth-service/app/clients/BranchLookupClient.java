@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.concurrent.CompletionStage;
 
 /**
- * Interface để tra cứu thông tin chi nhánh từ Catalog Service
+ * Giao diện tra cứu thông tin chi nhánh từ Catalog Service
  */
 public interface BranchLookupClient {
     /**

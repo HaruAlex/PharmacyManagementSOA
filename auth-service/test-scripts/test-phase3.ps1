@@ -1,10 +1,10 @@
+﻿# ============================================================================
+# KỊCH BẢN KIỂM THỬ PHASE 3 - Auth Service
 # ============================================================================
-# PHASE 3 TEST SCRIPT - Auth Service
-# ============================================================================
-# Test refresh token rotation, logout, branch selection
+# Kiểm thử xoay vòng refresh token, đăng xuất và chọn chi nhánh
 #
 # Yeu cau:
-# - Service dang chay tren http://localhost:9001
+# - Dịch vụ đang chạy tại http://localhost:9001
 # - Database da co du lieu seed
 # - AdminDevSeeder da chay (tai khoan admin.demo, warehouse.demo, pharmacist.demo)
 #
@@ -34,7 +34,7 @@ function Write-TestResult($success, $message) {
 }
 
 # ============================================================================
-# TEST 1: Dang nhap de lay access token va refresh token
+# TEST 1: Đăng nhập để lấy access token và refresh token
 # ============================================================================
 Write-TestHeader "TEST 1: Dang nhap - Lay access token va refresh token"
 
@@ -44,15 +44,10 @@ try {
         -ContentType "application/json" `
         -Body '{"usernameOrEmail":"admin.demo","password":"Admin@12345"}'
     
-    Write-Host "Response:" -ForegroundColor Yellow
-    $loginResponse | ConvertTo-Json -Depth 10
-    
     if ($loginResponse.accessToken -and $loginResponse.refreshToken) {
         Write-TestResult $true "Login thanh cong, nhan duoc access token va refresh token"
         $accessToken = $loginResponse.accessToken
         $refreshToken = $loginResponse.refreshToken
-        Write-Host "`nAccess Token: $($accessToken.Substring(0, 50))..." -ForegroundColor Cyan
-        Write-Host "Refresh Token: $($refreshToken.Substring(0, 50))...`n" -ForegroundColor Cyan
     } else {
         Write-TestResult $false "Login response thieu thong tin"
         exit 1
@@ -63,7 +58,7 @@ try {
 }
 
 # ============================================================================
-# TEST 2: Validate access token
+# TEST 2: Xác thực access token
 # ============================================================================
 Write-TestHeader "TEST 2: Validate - Kiem tra access token hop le"
 
@@ -85,7 +80,7 @@ try {
 }
 
 # ============================================================================
-# TEST 3: Refresh token - Rotation voi ExpiresAt co dinh
+# TEST 3: Xoay vòng refresh token, giữ nguyên ExpiresAt
 # ============================================================================
 Write-TestHeader "TEST 3: Refresh Token - Rotation voi ExpiresAt co dinh"
 
@@ -97,9 +92,6 @@ try {
         -ContentType "application/json" `
         -Body "{`"refreshToken`":`"$refreshToken`"}"
     
-    Write-Host "Refresh Response:" -ForegroundColor Yellow
-    $refreshResponse | ConvertTo-Json
-    
     if ($refreshResponse.accessToken -and $refreshResponse.refreshToken) {
         $newAccessToken = $refreshResponse.accessToken
         $newRefreshToken = $refreshResponse.refreshToken
@@ -108,8 +100,6 @@ try {
             Write-TestResult $true "Token rotation thanh cong (refresh token moi khac cu)"
             $accessToken = $newAccessToken
             $refreshToken = $newRefreshToken
-            Write-Host "`nNew Access Token: $($newAccessToken.Substring(0, 50))..." -ForegroundColor Green
-            Write-Host "New Refresh Token: $($newRefreshToken.Substring(0, 50))...`n" -ForegroundColor Green
         } else {
             Write-TestResult $false "Refresh token moi giong cu (khong rotate)"
         }
@@ -121,7 +111,7 @@ try {
 }
 
 # ============================================================================
-# TEST 4: Validate access token moi
+# TEST 4: Xác thực access token mới
 # ============================================================================
 Write-TestHeader "TEST 4: Validate - Kiem tra access token moi hop le"
 
@@ -140,7 +130,7 @@ try {
 }
 
 # ============================================================================
-# TEST 5: Reuse Detection - Dung lai refresh token cu
+# TEST 5: Phát hiện dùng lại refresh token cũ
 # ============================================================================
 Write-TestHeader "TEST 5: Reuse Detection - Dung refresh token da rotate"
 
@@ -162,7 +152,7 @@ try {
 }
 
 # ============================================================================
-# TEST 6: Branch Selection - Admin chon branch 2
+# TEST 6: Admin chọn chi nhánh 2
 # ============================================================================
 Write-TestHeader "TEST 6: Branch Selection - Admin chon branch 2"
 
@@ -173,15 +163,10 @@ try {
         -Headers @{"Authorization" = "Bearer $accessToken"} `
         -Body '{"branchId":2}'
     
-    Write-Host "Branch Selection Response:" -ForegroundColor Yellow
-    $branchResponse | ConvertTo-Json
-    
     if ($branchResponse.accessToken) {
         $branchToken = $branchResponse.accessToken
         Write-TestResult $true "Branch selection thanh cong"
-        Write-Host "`nBranch Token: $($branchToken.Substring(0, 50))...`n" -ForegroundColor Green
-        
-        # Verify token moi co currentBranchId = 2
+        # Xác nhận token mới có currentBranchId = 2
         try {
             $branchValidate = Invoke-RestMethod -Uri "$baseUrl/api/auth/validate" `
                 -Method GET `
@@ -203,7 +188,7 @@ try {
 }
 
 # ============================================================================
-# TEST 7: Branch Selection - Chon branch khong co quyen
+# TEST 7: Từ chối chọn chi nhánh không được cấp quyền
 # ============================================================================
 Write-TestHeader "TEST 7: Branch Selection - Chon branch khong co quyen (99)"
 
@@ -225,7 +210,7 @@ try {
 }
 
 # ============================================================================
-# TEST 8: Logout - Revoke refresh token hien tai
+# TEST 8: Đăng xuất và thu hồi refresh token hiện tại
 # ============================================================================
 Write-TestHeader "TEST 8: Logout - Revoke refresh token"
 
@@ -249,7 +234,7 @@ try {
 }
 
 # ============================================================================
-# TEST 9: Dung refresh token da logout
+# TEST 9: Từ chối refresh token đã đăng xuất
 # ============================================================================
 Write-TestHeader "TEST 9: Refresh - Dung token da logout (phai fail)"
 
@@ -270,7 +255,7 @@ try {
 }
 
 # ============================================================================
-# TEST 10: Login lai de test logout-all
+# TEST 10: Đăng nhập lại để kiểm tra đăng xuất mọi phiên
 # ============================================================================
 Write-TestHeader "TEST 10: Login lai - Tao nhieu sessions"
 
@@ -292,7 +277,7 @@ try {
 }
 
 # ============================================================================
-# TEST 11: Logout All - Revoke tat ca refresh tokens
+# TEST 11: Đăng xuất mọi phiên và thu hồi toàn bộ refresh token
 # ============================================================================
 Write-TestHeader "TEST 11: Logout All - Revoke tat ca refresh tokens"
 
@@ -314,7 +299,7 @@ try {
 }
 
 # ============================================================================
-# TEST 12: Dung refresh token sau khi logout-all
+# TEST 12: Từ chối refresh token sau khi đăng xuất mọi phiên
 # ============================================================================
 Write-TestHeader "TEST 12: Refresh - Dung token sau logout-all (phai fail)"
 
@@ -335,7 +320,7 @@ try {
 }
 
 # ============================================================================
-# TEST 13: Pharmacist (branch co dinh) - Khong the chon branch khac
+# TEST 13: Pharmacist không thể chọn chi nhánh khác
 # ============================================================================
 Write-TestHeader "TEST 13: Login pharmacist.demo - User co 1 branch co dinh"
 
@@ -349,7 +334,7 @@ try {
         Write-TestResult $true "Pharmacist login thanh cong"
         $pharmacistToken = $pharmacistLogin.accessToken
         
-        # TEST 13.1: Pharmacist co gang chuyen sang branch 1 (khong duoc phep)
+        # TEST 13.1: Pharmacist thử chuyển sang chi nhánh 1 (không được phép)
         Write-Host "`n  TEST 13.1: Pharmacist chon branch khong co quyen..." -ForegroundColor Yellow
         try {
             $pharmacistBranchResponse = Invoke-RestMethod -Uri "$baseUrl/api/auth/current-branch" `
@@ -375,7 +360,7 @@ try {
 }
 
 # ============================================================================
-# SUMMARY
+# TỔNG KẾT
 # ============================================================================
 Write-Host "`n" -NoNewline
 Write-Host "============================================" -ForegroundColor Cyan

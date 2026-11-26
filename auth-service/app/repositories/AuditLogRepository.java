@@ -15,8 +15,8 @@ public interface AuditLogRepository {
      */
     List<AuditLog> search(Integer userId, String actionCode, String entityName,
                           Instant fromDate, Instant toDate, 
-                          int page, int pageSize);
+                          int page, int pageSize, String sortOrder);
     
-    long countSearch(Integer userId, String actionCode, String entityName,
-                     Instant fromDate, Instant toDate);
+    long count(Integer userId, String actionCode, String entityName,
+               Instant fromDate, Instant toDate);
 }

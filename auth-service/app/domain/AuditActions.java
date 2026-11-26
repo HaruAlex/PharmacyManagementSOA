@@ -24,6 +24,7 @@ public final class AuditActions {
     public static final String USER_BRANCHES_CHANGED = "USER_BRANCHES_CHANGED";
     public static final String PASSWORD_RESET = "PASSWORD_RESET";
     public static final String PASSWORD_CHANGED = "PASSWORD_CHANGED";
+    public static final String PROFILE_UPDATED = "PROFILE_UPDATED";
     
     // Chọn chi nhánh
     public static final String BRANCH_SELECTED = "BRANCH_SELECTED";
@@ -32,6 +33,7 @@ public final class AuditActions {
     public static final String ROLE_CREATED = "ROLE_CREATED";
     public static final String ROLE_UPDATED = "ROLE_UPDATED";
     public static final String ROLE_DEACTIVATED = "ROLE_DEACTIVATED";
+    public static final String ROLE_ACTIVATED = "ROLE_ACTIVATED";
     public static final String PERMISSION_CREATED = "PERMISSION_CREATED";
     public static final String PERMISSION_UPDATED = "PERMISSION_UPDATED";
     public static final String ROLE_PERMISSIONS_CHANGED = "ROLE_PERMISSIONS_CHANGED";

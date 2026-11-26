@@ -2,12 +2,10 @@ package services;
 
 import com.typesafe.config.Config;
 import domain.AuditActions;
-import domain.AuditLog;
 import domain.ErrorCodes;
 import domain.RefreshToken;
 import domain.User;
 import errors.ApiException;
-import repositories.AuditLogRepository;
 import repositories.RefreshTokenRepository;
 import repositories.UserRepository;
 import security.RefreshTokenGenerator;
@@ -20,13 +18,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
 /**
- * Service xử lý refresh token logic
+ * Dịch vụ xử lý nghiệp vụ refresh token
  */
 @Singleton
 public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
-    private final AuditLogRepository auditLogRepository;
+    private final AuditService auditService;
     private final RefreshTokenGenerator tokenGenerator;
     private final Clock clock;
     private final int refreshTokenDays;
@@ -35,13 +33,13 @@ public class RefreshTokenService {
     public RefreshTokenService(
             RefreshTokenRepository refreshTokenRepository,
             UserRepository userRepository,
-            AuditLogRepository auditLogRepository,
+            AuditService auditService,
             RefreshTokenGenerator tokenGenerator,
             Clock clock,
             Config config) {
         this.refreshTokenRepository = refreshTokenRepository;
         this.userRepository = userRepository;
-        this.auditLogRepository = auditLogRepository;
+        this.auditService = auditService;
         this.tokenGenerator = tokenGenerator;
         this.clock = clock;
         this.refreshTokenDays = config.getInt("jwt.refreshTokenDays");
@@ -75,7 +73,7 @@ public class RefreshTokenService {
     }
 
     /**
-     * Rotate refresh token (revoke cũ, tạo mới, giữ nguyên ExpiresAt)
+     * Xoay vòng refresh token: thu hồi token cũ, tạo token mới và giữ nguyên ExpiresAt
      * @param plainToken Token cũ (plain text)
      * @param ipAddress IP address
      * @return Token mới (plain text)
@@ -95,10 +93,10 @@ public class RefreshTokenService {
         // Kiểm tra token đã bị revoke chưa
         if (oldToken.isRevoked()) {
             // REUSE DETECTION: Token đã revoke mà còn dùng → nghi ngờ bị đánh cắp
-            // Revoke tất cả token của user
+            // Thu hồi tất cả token của người dùng
             refreshTokenRepository.revokeAllByUserId(userId);
             
-            writeAuditLog(userId, null, AuditActions.REFRESH_TOKEN_REUSE,
+            auditService.write(userId, null, AuditActions.REFRESH_TOKEN_REUSE, "RefreshToken", null,
                 String.format("Refresh token reuse detected, all tokens revoked. IP: %s", ipAddress));
             
             throw ApiException.unauthorized(ErrorCodes.AUTH_REFRESH_REVOKED, 
@@ -126,7 +124,7 @@ public class RefreshTokenService {
             throw ApiException.unauthorized(ErrorCodes.AUTH_ACCOUNT_LOCKED, "Account is locked");
         }
         
-        // Revoke token cũ
+        // Thu hồi token cũ
         refreshTokenRepository.revoke(oldToken.getRefreshTokenId());
         
         // Tạo token mới với CÙNG ExpiresAt (không gia hạn)
@@ -157,11 +155,11 @@ public class RefreshTokenService {
             if (!token.isRevoked()) {
                 refreshTokenRepository.revoke(token.getRefreshTokenId());
                 
-                writeAuditLog(userId, null, AuditActions.LOGOUT_SUCCESS,
+                auditService.write(userId, null, AuditActions.LOGOUT_SUCCESS, "RefreshToken", null,
                     String.format("User logged out. IP: %s", ipAddress));
             }
         }
-        // Không throw exception nếu token không tồn tại (idempotent)
+        // Không ném ngoại lệ nếu token không tồn tại để thao tác có thể gọi lặp an toàn
     }
 
     /**
@@ -172,41 +170,23 @@ public class RefreshTokenService {
     }
 
     /**
-     * Revoke tất cả refresh token của user (logout all)
+     * Thu hồi tất cả refresh token của người dùng (đăng xuất mọi phiên)
      * @return Số lượng tokens đã revoke
      */
     public int revokeAllTokens(Integer userId, String ipAddress) {
         int revokedCount = refreshTokenRepository.revokeAllByUserId(userId);
         
-        writeAuditLog(userId, null, AuditActions.LOGOUT_ALL_SUCCESS,
+        auditService.write(userId, null, AuditActions.LOGOUT_ALL_SUCCESS, "RefreshToken", null,
             String.format("User logged out from all devices, %d tokens revoked. IP: %s", revokedCount, ipAddress));
         
         return revokedCount;
     }
 
     /**
-     * Xóa các refresh token đã hết hạn (cleanup)
+     * Xóa các refresh token đã hết hạn
      */
     public int cleanupExpiredTokens() {
         return refreshTokenRepository.deleteExpired();
     }
 
-    /**
-     * Ghi audit log (không throw exception nếu lỗi)
-     */
-    private void writeAuditLog(Integer userId, Integer branchId, String actionCode, String details) {
-        try {
-            AuditLog log = new AuditLog();
-            log.setUserId(userId);
-            log.setBranchId(branchId);
-            log.setActionCode(actionCode);
-            log.setEntityName("RefreshToken");
-            log.setDetails(details);
-            log.setCreatedAt(clock.instant());
-            
-            auditLogRepository.write(log);
-        } catch (Exception e) {
-            System.err.println("Failed to write audit log: " + e.getMessage());
-        }
-    }
 }

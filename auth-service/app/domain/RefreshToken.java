@@ -3,7 +3,7 @@ package domain;
 import java.time.Instant;
 
 /**
- * Entity RefreshToken - Token làm mới phiên đăng nhập
+ * Thực thể RefreshToken - Token làm mới phiên đăng nhập
  */
 public class RefreshToken {
     private Long refreshTokenId;

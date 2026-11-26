@@ -172,6 +172,31 @@ public class JdbcPermissionRepository implements PermissionRepository {
         });
     }
 
+    @Override
+    public void replaceRolePermissions(Integer roleId, List<Integer> permissionIds) {
+        database.withTransaction(conn -> {
+            // 1. Xóa tất cả permissions cũ của role
+            String deleteSql = "DELETE FROM auth.RolePermissions WHERE RoleId = ?";
+            try (PreparedStatement deletePs = conn.prepareStatement(deleteSql)) {
+                deletePs.setInt(1, roleId);
+                deletePs.executeUpdate();
+            }
+            
+            // 2. Thêm permissions mới
+            if (permissionIds != null && !permissionIds.isEmpty()) {
+                String insertSql = "INSERT INTO auth.RolePermissions (RoleId, PermissionId) VALUES (?, ?)";
+                try (PreparedStatement insertPs = conn.prepareStatement(insertSql)) {
+                    for (Integer permissionId : permissionIds) {
+                        insertPs.setInt(1, roleId);
+                        insertPs.setInt(2, permissionId);
+                        insertPs.addBatch();
+                    }
+                    insertPs.executeBatch();
+                }
+            }
+        });
+    }
+
     private Permission mapPermission(ResultSet rs) throws SQLException {
         Permission permission = new Permission();
         permission.setPermissionId(rs.getInt("PermissionId"));

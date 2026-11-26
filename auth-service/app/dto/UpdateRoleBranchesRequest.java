@@ -4,7 +4,7 @@ import javax.validation.constraints.*;
 import java.util.List;
 
 /**
- * Request DTO để gán role + branches cho user
+ * Đối tượng dữ liệu yêu cầu gán vai trò và chi nhánh cho người dùng
  */
 public class UpdateRoleBranchesRequest {
     @NotNull(message = "Role ID is required")

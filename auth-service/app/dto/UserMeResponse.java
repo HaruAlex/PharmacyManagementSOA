@@ -3,7 +3,7 @@ package dto;
 import java.util.List;
 
 /**
- * Response DTO cho /api/auth/me
+ * Đối tượng dữ liệu phản hồi cho /api/auth/me
  */
 public class UserMeResponse {
     private Integer userId;

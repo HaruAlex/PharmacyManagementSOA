@@ -1,0 +1,231 @@
+{
+  "info": {
+    "_postman_id": "469af8b5-9417-44b7-9ffb-7ec510e652f3",
+    "name": "Auth Service API",
+    "description": "Smoke/API collection for disposable local data. Run with the Auth Service - Local environment. State-changing requests create test entities; the test user is deleted at the end of the Users folder.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": ["pm.environment.set('runId', Date.now().toString());"]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const match = pm.info.requestName.match(/\\((\\d{3})\\)$/);",
+          "const expectedStatus = match ? Number(match[1]) : 200;",
+          "pm.test(`HTTP status is ${expectedStatus}`, () => pm.response.to.have.status(expectedStatus));",
+          "pm.test('Response content type is JSON', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json'));",
+          "const body = pm.response.json();",
+          "pm.test('Response matches the JSON object schema', () => { pm.expect(body).to.be.an('object'); pm.expect(Object.keys(body).length).to.be.greaterThan(0); });",
+          "if (pm.response.code >= 400) pm.test('Error response has the standard schema', () => { pm.expect(body).to.have.property('status'); pm.expect(body).to.have.property('code').that.is.a('string'); pm.expect(body).to.have.property('message').that.is.a('string'); });",
+          "const path = pm.request.url.toString();",
+          "if (/\\/api\\/auth\\/(login|refresh)/.test(path) && pm.response.code >= 200 && pm.response.code < 300) pm.test('Token response schema is present', () => { pm.expect(body.accessToken).to.be.a('string').and.not.empty; pm.expect(body.refreshToken).to.be.a('string').and.not.empty; });",
+          "if (path.endsWith('/api/auth/me') && pm.response.code === 200) pm.test('Current-user schema is present', () => { pm.expect(body.userId).to.be.a('number'); pm.expect(body.username).to.be.a('string'); pm.expect(body.roleCode).to.be.a('string'); pm.expect(body.branchIds).to.be.an('array'); });",
+          "if (/\\/api\\/auth\\/(login|refresh)/.test(path) && pm.response.code >= 200 && pm.response.code < 300) { if (body.accessToken) pm.environment.set('accessToken', body.accessToken); if (body.refreshToken) pm.environment.set('refreshToken', body.refreshToken); }",
+          "if (pm.request.method === 'POST' && path.includes('/api/users') && !path.includes('/lock') && !path.includes('/unlock') && !path.includes('/reset-password')) pm.environment.set('userId', pm.response.json().userId);",
+          "if (pm.request.method === 'POST' && path.endsWith('/api/roles')) pm.environment.set('roleId', pm.response.json().roleId);",
+          "if (pm.request.method === 'POST' && path.endsWith('/api/permissions')) pm.environment.set('permissionId', pm.response.json().permissionId);"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        { "name": "Health (200)", "request": { "method": "GET", "url": "{{baseUrl}}/health" } },
+        { "name": "Detailed health (200)", "request": { "method": "GET", "url": "{{baseUrl}}/health/detailed" } }
+      ]
+    },
+    {
+      "name": "Login/Session",
+      "item": [
+        {
+          "name": "Login (200)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"usernameOrEmail\":\"{{adminUsername}}\",\"password\":\"{{adminPassword}}\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/login"
+          }
+        },
+        {
+          "name": "Refresh (200)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"{{refreshToken}}\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout (200)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"refreshToken\":\"{{refreshToken}}\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
+        },
+        { "name": "Logout all (200)", "request": { "method": "POST", "url": "{{baseUrl}}/api/auth/logout-all" } },
+        { "name": "Validate access token (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/validate" } },
+        { "name": "Current user (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/me" } },
+        {
+          "name": "Select current branch (200)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"branchId\":{{branchId}}}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/current-branch"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Profile",
+      "item": [
+        { "name": "Get profile (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/profile" } },
+        {
+          "name": "Update profile - required field validation (400)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"fullName\":\"\",\"email\":\"admin@example.local\",\"phone\":null}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/profile"
+          }
+        },
+        {
+          "name": "Change password - invalid current password (401)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"currentPassword\":\"wrong-current-password\",\"newPassword\":\"Postman@12345\",\"confirmNewPassword\":\"Postman@12345\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/auth/change-password"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Create user (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"fullName\":\"Postman User {{runId}}\",\"username\":\"pm.user.{{runId}}\",\"password\":\"Strong@Pass123\",\"email\":\"pm.user.{{runId}}@example.local\",\"phone\":\"0900000000\",\"roleId\":{{roleId}},\"branchIds\":[{{branchId}}]}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users"
+          }
+        },
+        { "name": "List users (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/users?page=1&pageSize=10" } },
+        { "name": "Get user (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/users/{{userId}}" } },
+        {
+          "name": "Update user (200)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"fullName\":\"Postman User Updated\",\"email\":\"pm.updated.{{runId}}@example.local\",\"phone\":\"0900000001\",\"roleId\":{{roleId}}}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Update role and branches (200)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"roleId\":{{roleId}},\"branchIds\":[{{branchId}}]}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users/{{userId}}/role-branches"
+          }
+        },
+        { "name": "Lock user (200)", "request": { "method": "POST", "url": "{{baseUrl}}/api/users/{{userId}}/lock" } },
+        { "name": "Unlock user (200)", "request": { "method": "POST", "url": "{{baseUrl}}/api/users/{{userId}}/unlock" } },
+        { "name": "Activate user (200)", "request": { "method": "POST", "url": "{{baseUrl}}/api/users/{{userId}}/activate" } },
+        {
+          "name": "Reset user password (200)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"newPassword\":\"Reset@Pass123\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/users/{{userId}}/reset-password"
+          }
+        },
+        { "name": "Delete test user (200)", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/users/{{userId}}" } }
+      ]
+    },
+    {
+      "name": "RBAC",
+      "item": [
+        { "name": "List roles (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/roles" } },
+        {
+          "name": "Create role (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"code\":\"PM{{runId}}\",\"name\":\"Postman {{runId}}\",\"description\":\"Temporary Postman role\",\"isActive\":true}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/roles"
+          }
+        },
+        { "name": "Get role (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/roles/{{roleId}}" } },
+        {
+          "name": "Update role (200)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Postman Role Updated\",\"description\":\"Updated by Postman\",\"isActive\":true}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/roles/{{roleId}}"
+          }
+        },
+        { "name": "Get role permissions (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions" } },
+        {
+          "name": "List permissions (200)",
+          "request": { "method": "GET", "url": "{{baseUrl}}/api/permissions" }
+        },
+        {
+          "name": "Create permission (201)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"code\":\"PM{{runId}}\",\"name\":\"Postman Permission\",\"description\":\"Temporary Postman permission\",\"category\":\"TEST\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/permissions"
+          }
+        },
+        { "name": "Get permission (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/permissions/{{permissionId}}" } },
+        {
+          "name": "Update permission (200)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"name\":\"Postman Permission Updated\",\"description\":\"Updated by Postman\",\"category\":\"TEST\"}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/permissions/{{permissionId}}"
+          }
+        },
+        {
+          "name": "Replace role permissions (200)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\"permissionIds\":[{{permissionId}}]}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/api/roles/{{roleId}}/permissions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit",
+      "item": [
+        { "name": "Search audit logs (200)", "request": { "method": "GET", "url": "{{baseUrl}}/api/audit-logs?page=1&pageSize=10" } }
+      ]
+    }
+  ]
+}

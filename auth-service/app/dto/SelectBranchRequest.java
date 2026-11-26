@@ -3,7 +3,7 @@ package dto;
 import javax.validation.constraints.NotNull;
 
 /**
- * Request DTO cho chọn chi nhánh
+ * Đối tượng dữ liệu yêu cầu chọn chi nhánh
  */
 public class SelectBranchRequest {
     @NotNull(message = "Branch ID is required")

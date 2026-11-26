@@ -1,7 +1,7 @@
 package domain;
 
 /**
- * Entity Permission - Quyền hạn trong hệ thống
+ * Thực thể Permission - Quyền hạn trong hệ thống
  */
 public class Permission {
     private Integer permissionId;
