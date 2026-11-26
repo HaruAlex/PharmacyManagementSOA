@@ -12,7 +12,59 @@ GET     /health/detailed                    controllers.HealthController.detaile
 # ============================================================================
 # CATALOG SERVICE ENDPOINTS
 # ============================================================================
-# TODO: Implement các endpoint này
+
+# Branch CRUD and lifecycle
+GET     /api/v1/catalog/branches                         controllers.BranchController.list()
+GET     /api/v1/catalog/branches/:id                     controllers.BranchController.get(id: Long)
+POST    /api/v1/catalog/branches                         controllers.BranchController.create(request: Request)
+PUT     /api/v1/catalog/branches/:id                     controllers.BranchController.update(id: Long, request: Request)
+PATCH   /api/v1/catalog/branches/:id/status              controllers.BranchController.changeStatus(id: Long, request: Request)
+
+# Drug CRUD and search. Keep the barcode route before the numeric-ID route.
+GET     /api/v1/catalog/drugs                            controllers.DrugController.search(request: Request)
+GET     /api/v1/catalog/drugs/by-barcode/:code           controllers.DrugController.getByBarcode(code: String)
+GET     /api/v1/catalog/drugs/:id                        controllers.DrugController.get(id: Long)
+POST    /api/v1/catalog/drugs                            controllers.DrugController.create(request: Request)
+PUT     /api/v1/catalog/drugs/:id                        controllers.DrugController.update(id: Long, request: Request)
+PUT     /api/v1/catalog/drugs/:id/units                   controllers.DrugController.setUnits(id: Long, request: Request)
+DELETE  /api/v1/catalog/drugs/:id                        controllers.DrugController.discontinue(id: Long)
+
+# Drug groups
+GET     /api/v1/catalog/drug-groups                      controllers.DrugGroupController.list()
+GET     /api/v1/catalog/drug-groups/roots                controllers.DrugGroupController.roots()
+GET     /api/v1/catalog/drug-groups/:id/children         controllers.DrugGroupController.children(id: Long)
+GET     /api/v1/catalog/drug-groups/:id                  controllers.DrugGroupController.get(id: Long)
+POST    /api/v1/catalog/drug-groups                      controllers.DrugGroupController.create(request: Request)
+PUT     /api/v1/catalog/drug-groups/:id                  controllers.DrugGroupController.update(id: Long, request: Request)
+DELETE  /api/v1/catalog/drug-groups/:id                  controllers.DrugGroupController.delete(id: Long)
+
+# Manufacturers
+GET     /api/v1/catalog/manufacturers                    controllers.ManufacturerController.list()
+GET     /api/v1/catalog/manufacturers/:id                controllers.ManufacturerController.get(id: Long)
+POST    /api/v1/catalog/manufacturers                    controllers.ManufacturerController.create(request: Request)
+PUT     /api/v1/catalog/manufacturers/:id                controllers.ManufacturerController.update(id: Long, request: Request)
+DELETE  /api/v1/catalog/manufacturers/:id                controllers.ManufacturerController.delete(id: Long)
+
+# Units
+GET     /api/v1/catalog/units                            controllers.UnitController.list()
+GET     /api/v1/catalog/units/:id                        controllers.UnitController.get(id: Long)
+POST    /api/v1/catalog/units                            controllers.UnitController.create(request: Request)
+PUT     /api/v1/catalog/units/:id                        controllers.UnitController.update(id: Long, request: Request)
+DELETE  /api/v1/catalog/units/:id                        controllers.UnitController.delete(id: Long)
+
+# Suppliers
+GET     /api/v1/catalog/suppliers                        controllers.SupplierController.list(request: Request)
+GET     /api/v1/catalog/suppliers/:id                    controllers.SupplierController.get(id: Long)
+POST    /api/v1/catalog/suppliers                        controllers.SupplierController.create(request: Request)
+PUT     /api/v1/catalog/suppliers/:id                    controllers.SupplierController.update(id: Long, request: Request)
+DELETE  /api/v1/catalog/suppliers/:id                    controllers.SupplierController.delete(id: Long)
+
+# Customers
+GET     /api/v1/catalog/customers                        controllers.CustomerController.search(request: Request)
+GET     /api/v1/catalog/customers/:id                    controllers.CustomerController.get(id: Long)
+POST    /api/v1/catalog/customers                        controllers.CustomerController.create(request: Request)
+PUT     /api/v1/catalog/customers/:id                    controllers.CustomerController.update(id: Long, request: Request)
+DELETE  /api/v1/catalog/customers/:id                    controllers.CustomerController.delete(id: Long)
 
 # An example controller showing a sample home page
 GET     /                           controllers.HomeController.index()
