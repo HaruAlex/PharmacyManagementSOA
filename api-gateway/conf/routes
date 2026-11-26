@@ -22,10 +22,11 @@ POST    /inventory/*path                    controllers.GatewayController.proxyI
 PUT     /inventory/*path                    controllers.GatewayController.proxyInventory(path)
 DELETE  /inventory/*path                    controllers.GatewayController.proxyInventory(path)
 
-GET     /purchase/*path                     controllers.GatewayController.proxyPurchase(path)
-POST    /purchase/*path                     controllers.GatewayController.proxyPurchase(path)
-PUT     /purchase/*path                     controllers.GatewayController.proxyPurchase(path)
-DELETE  /purchase/*path                     controllers.GatewayController.proxyPurchase(path)
+GET     /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
+POST    /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
+PUT     /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
+PATCH   /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
+DELETE  /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
 
 GET     /sales/*path                        controllers.GatewayController.proxySales(path)
 POST    /sales/*path                        controllers.GatewayController.proxySales(path)
