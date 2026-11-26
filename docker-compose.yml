@@ -1,0 +1,202 @@
+version: "3.8"
+
+services:
+  # ============================================================================
+  # Consul — Service discovery & configuration
+  # ============================================================================
+  consul:
+    image: consul:latest
+    ports:
+      - "8500:8500"
+    command: consul agent -dev -client=0.0.0.0 -data-dir=/consul/data
+    volumes:
+      - consul-data:/consul/data
+    networks:
+      - pharmacy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8500/v1/status/leader"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ============================================================================
+  # SQL Server — Cơ sở dữ liệu dùng chung (mỗi service một database riêng)
+  # ============================================================================
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      SA_PASSWORD: ${SA_PASSWORD:-Strong!Pass123}
+      ACCEPT_EULA: "Y"
+    ports:
+      - "1433:1433"
+    networks:
+      - pharmacy
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P \"$${SA_PASSWORD:-Strong!Pass123}\" -Q 'SELECT 1' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+  # ============================================================================
+  # API Gateway (port 9000)
+  # ============================================================================
+  api-gateway:
+    build: .
+    working_dir: /app/api-gateway
+    command: sbt -Dplay.server.http.port=9000 "run 9000"
+    ports:
+      - "9000:9000"
+    environment:
+      - PLAY_HTTP_PORT=9000
+      - CONSUL_ADDRESS=http://consul:8500
+      - SERVICE_ADDRESS=
+      - SERVICE_HOST=
+      - JWT_SECRET=${JWT_SECRET:-change-me-min-32-chars}
+      - APPLICATION_SECRET=${APPLICATION_SECRET:-change-me-play-secret}
+    depends_on:
+      consul:
+        condition: service_healthy
+    networks:
+      - pharmacy
+
+  # ============================================================================
+  # Auth Service (port 9001) — database: auth_db
+  # ============================================================================
+  auth-service:
+    build: .
+    working_dir: /app/auth-service
+    command: sbt -Dplay.server.http.port=9001 "run 9001"
+    ports:
+      - "9001:9001"
+    environment:
+      - PLAY_HTTP_PORT=9001
+      - CONSUL_ADDRESS=http://consul:8500
+      - SERVICE_ADDRESS=
+      - SERVICE_HOST=
+      - DATABASE_URL=jdbc:sqlserver://sqlserver:1433;databaseName=${AUTH_DB:-auth_db};encrypt=false;trustServerCertificate=true
+      - DATABASE_USER=${DATABASE_USER:-sa}
+      - DATABASE_PASSWORD=${SA_PASSWORD:-Strong!Pass123}
+      - JWT_SECRET=${JWT_SECRET:-change-me-min-32-chars}
+      - APPLICATION_SECRET=${APPLICATION_SECRET:-change-me-play-secret}
+    depends_on:
+      consul:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - pharmacy
+
+
+  # ============================================================================
+  # Catalog Service (port 9002) — database: catalog_db
+  # ============================================================================
+  catalog-service:
+    build: .
+    working_dir: /app/catalog-service
+    command: sbt -Dplay.server.http.port=9002 "run 9002"
+    ports:
+      - "9002:9002"
+    environment:
+      - PLAY_HTTP_PORT=9002
+      - CONSUL_ADDRESS=http://consul:8500
+      - SERVICE_ADDRESS=
+      - SERVICE_HOST=
+      - DATABASE_URL=jdbc:sqlserver://sqlserver:1433;databaseName=${CATALOG_DB:-catalog_db};encrypt=false;trustServerCertificate=true
+      - DATABASE_USER=${DATABASE_USER:-sa}
+      - DATABASE_PASSWORD=${SA_PASSWORD:-Strong!Pass123}
+      - JWT_SECRET=${JWT_SECRET:-change-me-min-32-chars}
+      - APPLICATION_SECRET=${APPLICATION_SECRET:-change-me-play-secret}
+    depends_on:
+      consul:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - pharmacy
+
+  # ============================================================================
+  # Inventory Service (port 9003) — database: inventory_db
+  # ============================================================================
+  inventory-service:
+    build: .
+    working_dir: /app/inventory-service
+    command: sbt -Dplay.server.http.port=9003 "run 9003"
+    ports:
+      - "9003:9003"
+    environment:
+      - PLAY_HTTP_PORT=9003
+      - CONSUL_ADDRESS=http://consul:8500
+      - SERVICE_ADDRESS=
+      - SERVICE_HOST=
+      - DATABASE_URL=jdbc:sqlserver://sqlserver:1433;databaseName=${INVENTORY_DB:-inventory_db};encrypt=false;trustServerCertificate=true
+      - DATABASE_USER=${DATABASE_USER:-sa}
+      - DATABASE_PASSWORD=${SA_PASSWORD:-Strong!Pass123}
+      - JWT_SECRET=${JWT_SECRET:-change-me-min-32-chars}
+      - APPLICATION_SECRET=${APPLICATION_SECRET:-change-me-play-secret}
+    depends_on:
+      consul:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - pharmacy
+  # ============================================================================
+  # Purchase Service (port 9004) — database: purchase_db
+  # ============================================================================
+  purchase-service:
+    build: .
+    working_dir: /app/purchase-service
+    command: sbt -Dplay.server.http.port=9004 "run 9004"
+    ports:
+      - "9004:9004"
+    environment:
+      - PLAY_HTTP_PORT=9004
+      - CONSUL_ADDRESS=http://consul:8500
+      - SERVICE_ADDRESS=
+      - SERVICE_HOST=
+      - DATABASE_URL=jdbc:sqlserver://sqlserver:1433;databaseName=${PURCHASE_DB:-purchase_db};encrypt=false;trustServerCertificate=true
+      - DATABASE_USER=${DATABASE_USER:-sa}
+      - DATABASE_PASSWORD=${SA_PASSWORD:-Strong!Pass123}
+      - JWT_SECRET=${JWT_SECRET:-change-me-min-32-chars}
+      - APPLICATION_SECRET=${APPLICATION_SECRET:-change-me-play-secret}
+    depends_on:
+      consul:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - pharmacy
+
+  # ============================================================================
+  # Sales Service (port 9005) — database: sales_db
+  # ============================================================================
+  sales-service:
+    build: .
+    working_dir: /app/sales-service
+    command: sbt -Dplay.server.http.port=9005 "run 9005"
+    ports:
+      - "9005:9005"
+    environment:
+      - PLAY_HTTP_PORT=9005
+      - CONSUL_ADDRESS=http://consul:8500
+      - SERVICE_ADDRESS=
+      - SERVICE_HOST=
+      - DATABASE_URL=jdbc:sqlserver://sqlserver:1433;databaseName=${SALES_DB:-sales_db};encrypt=false;trustServerCertificate=true
+      - DATABASE_USER=${DATABASE_USER:-sa}
+      - DATABASE_PASSWORD=${SA_PASSWORD:-Strong!Pass123}
+      - JWT_SECRET=${JWT_SECRET:-change-me-min-32-chars}
+      - APPLICATION_SECRET=${APPLICATION_SECRET:-change-me-play-secret}
+    depends_on:
+      consul:
+        condition: service_healthy
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - pharmacy
+
+volumes:
+  consul-data:
+
+networks:
+  pharmacy:
+    driver: bridge
+
