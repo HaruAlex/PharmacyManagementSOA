@@ -41,3 +41,9 @@ GET     /api/drug-lots/:id          controllers.DrugLotController.getLotDetail(r
 
 # Stock Ledger (BE-30 / FR-KH-03)
 GET   /api/v1/inventory/ledger   controllers.StockLedgerController.getLedger(request: Request, drugId: Integer ?= null, lotId: Integer ?= null, type: String ?= null, from: String ?= null, to: String ?= null, page: Int ?= 1, size: Int ?= 20, sort: String ?= "createdAt,desc")
+
+
+//API chuyen kho (BE 31)
+POST    /api/v1/inventory/transfers          controllers.StockTransferController.createTransfer(request: Request)
+GET     /api/v1/inventory/transfers          controllers.StockTransferController.listTransfers(request: Request, targetBranchId: Option[Int] ?= None, status: Option[String] ?= None, page: Int ?= 1, size: Int ?= 20, sort: String ?= "createdAt,desc")
+GET     /api/v1/inventory/transfers/:id      controllers.StockTransferController.getTransferById(request: Request, id: Long)
