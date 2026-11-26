@@ -16,6 +16,9 @@
   exclusion, standard error envelopes, and CORS for the public prefixes.
 - Updated Auth-to-Catalog and Sales-to-Inventory clients to resolve healthy
   instances through Consul instead of fixed URLs.
+- Added `docker-compose.yml`, `Dockerfile`, and `.env.example` to run Consul
+  (dev), SQL Server 2022, Gateway and the five business services with
+  per-service databases; connection strings and secrets are read from env.
 - Added focused Gateway and Auth tests, route contract documentation, new
   service instructions, and a smoke-test script.
 - Gateway tests pass, including retry/no-instance, CORS preflight, and loading
@@ -23,9 +26,9 @@
   and Sales compile. The smoke script passes PowerShell syntax parsing only;
   it has not been run against live services.
 
-Known Phase 1 gate limitations: this checkout has no `docker-compose.yml` and
-Docker/Compose was unavailable during the earlier environment check. Full
-multi-instance Consul failover and a live request through the stub service
+Known Phase 1 gate limitations: `docker-compose.yml` now exists but has not
+been exercised (Docker/Compose was unavailable during the environment check).
+Full multi-instance Consul failover and a live request through the stub service
 remain to be demonstrated in an environment with Consul/Compose.
 
 The business endpoint mismatches documented in
