@@ -6,6 +6,7 @@ import clients.HttpBranchLookupClient;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
 import com.typesafe.config.Config;
+import integration.consul.ServiceResolver;
 import play.Environment;
 import play.libs.ws.WSClient;
 import repositories.*;
@@ -50,9 +51,10 @@ public class AuthModule extends AbstractModule {
     BranchLookupClient provideBranchLookupClient(
             WSClient wsClient,
             Config config,
+            ServiceResolver resolver,
             Environment environment) {
         if (environment.isProd()) {
-            return new HttpBranchLookupClient(wsClient, config);
+            return new HttpBranchLookupClient(wsClient, config, resolver);
         }
         return new FakeBranchLookupClient();
     }

@@ -230,7 +230,7 @@ foreach ($serviceInfo in $servicesPorts) {
         Start-Sleep -Seconds 2
         
         $process2 = Start-Process -FilePath "sbt" `
-            -ArgumentList "-Dservice.instance.id=$($service)-2", "`"run $port2`"" `
+            -ArgumentList "-Dservice.instance.id=$($service)-2", "-Dservice.port=$port2", "`"run $port2`"" `
             -WorkingDirectory $serviceDir `
             -RedirectStandardOutput (Join-Path $RepoRoot "logs\$($service)-2.out.log") `
             -RedirectStandardError (Join-Path $RepoRoot "logs\$($service)-2.err.log") `

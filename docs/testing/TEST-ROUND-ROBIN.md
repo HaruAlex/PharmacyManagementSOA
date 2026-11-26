@@ -27,7 +27,7 @@ docker run -p 8500:8500 -p 8600:8600/udp --name consul -d consul agent -server -
 **Terminal 1:**
 ```powershell
 cd d:\Java\PharmacyManagementSOA\api-gateway
-sbt -Dservice.instance.id=gateway-1 "run 9000"
+sbt -Dservice.instance.id=gateway-1 -Dservice.port=9000 "run 9000"
 ```
 
 Chờ log thấy:
@@ -42,7 +42,7 @@ Chờ log thấy:
 **Terminal 2:**
 ```powershell
 cd d:\Java\PharmacyManagementSOA\auth-service
-sbt -Dservice.instance.id=auth-1 "run 9001"
+sbt -Dservice.instance.id=auth-1 -Dservice.port=9001 "run 9001"
 ```
 
 Chờ log:
@@ -53,7 +53,7 @@ Chờ log:
 **Terminal 3:**
 ```powershell
 cd d:\Java\PharmacyManagementSOA\auth-service
-sbt -Dservice.instance.id=auth-2 "run 9011"
+sbt -Dservice.instance.id=auth-2 -Dservice.port=9011 "run 9011"
 ```
 
 Chờ log:

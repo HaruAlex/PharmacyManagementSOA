@@ -12,6 +12,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
+import integration.consul.ServiceResolver;
 import play.Application;
 import play.db.ConnectionCallable;
 import play.db.Database;
@@ -71,7 +72,9 @@ class AuthPhase7EndToEndTest {
         store.replaceRolePermissionIds(1, List.of(1));
 
         application = new GuiceApplicationBuilder()
-                .configure("play.modules.disabled", List.of("modules.StartupModule", "modules.ConsulModule"))
+                .configure("play.modules.disabled", List.of(
+                        "modules.StartupModule",
+                        "integration.consul.ConsulModule"))
                 .configure("security.rateLimit.login.maxPerIdentity", 100)
                 .configure("security.rateLimit.login.maxPerIp", 1000)
                 .configure("security.rateLimit.refresh.maxPerIdentity", 100)
@@ -87,7 +90,8 @@ class AuthPhase7EndToEndTest {
                         bind(UserBranchRepository.class).toInstance(store),
                         bind(RefreshTokenRepository.class).toInstance(store),
                         bind(AuditLogRepository.class).toInstance(store),
-                        bind(Database.class).toInstance(inMemoryDatabase()))
+                        bind(Database.class).toInstance(inMemoryDatabase()),
+                        bind(ServiceResolver.class).toInstance(mock(ServiceResolver.class)))
                 .build();
         start(application);
     }

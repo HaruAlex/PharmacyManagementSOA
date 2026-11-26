@@ -21,8 +21,7 @@
         </encoder>
     </appender>
 
-    <!-- Logger cho Consul module -->
-    <logger name="modules.ConsulModule" level="INFO" additivity="false">
+    <logger name="integration.consul.ConsulServiceRegistration" level="INFO" additivity="false">
         <appender-ref ref="FILE"/>
         <appender-ref ref="STDOUT"/>
     </logger>

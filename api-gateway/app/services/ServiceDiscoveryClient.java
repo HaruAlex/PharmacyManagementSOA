@@ -1,12 +1,12 @@
 package services;
 
-import com.ecwid.consul.v1.ConsulClient;
 import com.ecwid.consul.v1.health.model.HealthService;
+import integration.consul.ConsulServiceResolver;
+import integration.consul.ServiceResolver;
 import play.Logger;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -17,20 +17,18 @@ import java.util.List;
  * API Gateway sử dụng Consul để khám phá dịch vụ thay vì hard-code URL.
  * 
  * Đợt 2: Khám phá dịch vụ (Service Discovery)
- * Đợt 3: Thêm LoadBalancer để cân bằng tải
+ * Round-robin and healthy-instance selection are provided by the shared resolver.
  * 
  * @author Nhóm 4 - Đại học Quy Nhơn
  */
 @Singleton
 public class ServiceDiscoveryClient {
     
-    private final ConsulClient consulClient;
-    private final LoadBalancer loadBalancer;
+    private final ServiceResolver resolver;
     
     @Inject
-    public ServiceDiscoveryClient(ConsulClient consulClient, LoadBalancer loadBalancer) {
-        this.consulClient = consulClient;
-        this.loadBalancer = loadBalancer;
+    public ServiceDiscoveryClient(ServiceResolver resolver) {
+        this.resolver = resolver;
     }
     
     /**
@@ -40,43 +38,22 @@ public class ServiceDiscoveryClient {
      * @return Danh sách HealthService
      */
     public List<HealthService> getHealthyServiceInstances(String serviceName) {
-        try {
-            // Gọi Consul: lấy tất cả instance của service (onlyPassing=true)
-            // Parameter: serviceName, tag (null), onlyPassing (true), queryParams (null)
-            List<HealthService> services = consulClient.getHealthServices(serviceName, true, null).getValue();
-            if (services == null) {
-                services = new ArrayList<>();
-            }
-            
-            Logger.info("[ServiceDiscovery] " + serviceName + ": " + services.size() + " instance passing");
-            return services;
-        } catch (Exception e) {
-            Logger.error("[ServiceDiscovery] Lỗi khi lấy " + serviceName + ": " + e.getMessage());
-            return new ArrayList<>();
-        }
+        List<HealthService> services = resolver.getHealthyInstances(serviceName);
+        Logger.info("[ServiceDiscovery] " + serviceName + ": " + services.size() + " passing instances");
+        return services;
     }
     
     /**
-     * Chọn 1 instance khỏe mạnh bằng LoadBalancer (Round-robin)
-     * 
-     * Đợt 3: Dùng LoadBalancer thay vì random
+     * Select a healthy instance through the shared resolver.
      */
     public HealthService getHealthyInstance(String serviceName) {
-        List<HealthService> instances = getHealthyServiceInstances(serviceName);
-        if (instances.isEmpty()) {
-            Logger.warn("[ServiceDiscovery] Không tìm instance nào: " + serviceName);
-            return null;
-        }
-        return loadBalancer.selectInstance(instances);
+        return resolver.resolve(serviceName).orElse(null);
     }
     
     /**
      * Lấy URL của service
      */
     public String getServiceUrl(HealthService healthService) {
-        if (healthService == null) return null;
-        String host = healthService.getService().getAddress();
-        int port = healthService.getService().getPort();
-        return "http://" + host + ":" + port;
+        return healthService == null ? null : ConsulServiceResolver.baseUrl(healthService);
     }
 }

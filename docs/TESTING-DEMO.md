@@ -142,7 +142,7 @@ curl http://localhost:9001/health
 
 ```bash
 cd auth-service
-sbt -Dservice.instance.id=auth-2 "run 9011"
+sbt -Dservice.instance.id=auth-2 -Dservice.port=9011 "run 9011"
 
 # Kỳ vọng:
 # [success] play.server.netty.NettyServer - Listening for HTTP on [::]:9011

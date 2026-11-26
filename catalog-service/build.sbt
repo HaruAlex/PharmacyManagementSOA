@@ -7,6 +7,8 @@ lazy val root = (project in file(".")).enablePlugins(PlayJava)
 
 scalaVersion := "2.13.18"
 
+Compile / unmanagedSourceDirectories += baseDirectory.value.getParentFile / "shared" / "src" / "main" / "java"
+
 libraryDependencies += guice
 
 // Consul Client - Service Discovery & Registration

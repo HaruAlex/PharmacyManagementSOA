@@ -2,6 +2,9 @@ package clients;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.typesafe.config.Config;
+import com.ecwid.consul.v1.health.model.HealthService;
+import integration.consul.ConsulServiceResolver;
+import integration.consul.ServiceResolver;
 import play.libs.ws.WSClient;
 import play.libs.ws.WSResponse;
 
@@ -10,24 +13,49 @@ import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CompletableFuture;
 
 @Singleton
 public class HttpBranchLookupClient implements BranchLookupClient {
     private final WSClient wsClient;
-    private final String activeBranchesUrl;
+    private final ServiceResolver resolver;
+    private final String serviceName;
+    private final String activeBranchesPath;
+    private final int requestTimeoutMillis;
 
     @Inject
-    public HttpBranchLookupClient(WSClient wsClient, Config config) {
+    public HttpBranchLookupClient(
+            WSClient wsClient,
+            Config config,
+            ServiceResolver resolver) {
         this.wsClient = wsClient;
-        String baseUrl = config.getString("catalog.service.baseUrl").replaceAll("/+$", "");
-        String path = config.getString("catalog.service.activeBranchesPath");
-        this.activeBranchesUrl = baseUrl + (path.startsWith("/") ? path : "/" + path);
+        this.resolver = resolver;
+        this.serviceName = config.getString("catalog.service.name");
+        this.activeBranchesPath = config.getString("catalog.service.activeBranchesPath");
+        this.requestTimeoutMillis = config.getInt("catalog.service.timeout-ms");
     }
 
     @Override
     public CompletionStage<List<Integer>> getAllActiveBranchIds() {
-        return wsClient.url(activeBranchesUrl).get().thenApply(this::readActiveBranchIds);
+        try {
+            Optional<HealthService> instance = resolver.resolve(serviceName);
+            if (instance.isEmpty()) {
+                return CompletableFuture.failedFuture(
+                        new IllegalStateException("No healthy Catalog Service instance is available"));
+            }
+            String path = activeBranchesPath.startsWith("/")
+                    ? activeBranchesPath
+                    : "/" + activeBranchesPath;
+            String url = ConsulServiceResolver.baseUrl(instance.get()) + path;
+            return wsClient.url(url)
+                    .setRequestTimeout(requestTimeoutMillis)
+                    .get()
+                    .thenApply(this::readActiveBranchIds);
+        } catch (RuntimeException e) {
+            return CompletableFuture.failedFuture(e);
+        }
     }
 
     @Override

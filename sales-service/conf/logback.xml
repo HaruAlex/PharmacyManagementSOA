@@ -18,7 +18,7 @@
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
     </appender>
-    <logger name="modules.ConsulModule" level="INFO" additivity="false">
+    <logger name="integration.consul.ConsulServiceRegistration" level="INFO" additivity="false">
         <appender-ref ref="FILE"/>
         <appender-ref ref="STDOUT"/>
     </logger>

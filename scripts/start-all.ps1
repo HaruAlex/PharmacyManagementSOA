@@ -160,7 +160,7 @@ function Start-Service {
             if ($InstanceId -match "-2$") {
                 # Instance 2
                 $process = Start-Process -FilePath "sbt" `
-                    -ArgumentList "-Dservice.instance.id=$InstanceId", "`"run $Port`"" `
+                    -ArgumentList "-Dservice.instance.id=$InstanceId", "-Dservice.port=$Port", "`"run $Port`"" `
                     -RedirectStandardOutput $LogFile `
                     -RedirectStandardError $LogFile `
                     -PassThru `
@@ -169,7 +169,7 @@ function Start-Service {
             else {
                 # Instance 1
                 $process = Start-Process -FilePath "sbt" `
-                    -ArgumentList "`"run $Port`"" `
+                    -ArgumentList "-Dservice.port=$Port", "`"run $Port`"" `
                     -RedirectStandardOutput $LogFile `
                     -RedirectStandardError $LogFile `
                     -PassThru `

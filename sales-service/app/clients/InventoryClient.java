@@ -1,6 +1,13 @@
 package clients;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.ecwid.consul.v1.health.model.HealthService;
+import com.typesafe.config.Config;
+import integration.consul.ConsulServiceResolver;
+import integration.consul.ServiceResolver;
+
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -9,7 +16,7 @@ import java.io.*;
 /**
  * InventoryClient - HTTP Client để gọi Inventory Service
  * 
- * Base URL: http://localhost:9004/api/v1/inventory (inventory-service)
+ * The Inventory instance is resolved through Consul.
  * 
  * Methods:
  * - Trừ tồn kho (deduct stock)
@@ -18,9 +25,19 @@ import java.io.*;
  * 
  * @author Nhóm 4 - Đại học Quy Nhơn
  */
+@Singleton
 public class InventoryClient {
     
-    private static final String INVENTORY_SERVICE_URL = "http://localhost:9004/api/v1/inventory";
+    private final ServiceResolver resolver;
+    private final String serviceName;
+    private final String apiPrefix;
+
+    @Inject
+    public InventoryClient(ServiceResolver resolver, Config config) {
+        this.resolver = resolver;
+        this.serviceName = config.getString("inventory.service.name");
+        this.apiPrefix = config.getString("inventory.service.api-prefix");
+    }
     
     /**
      * Lấy tồn kho theo lô (FEFO - First Expired First Out)
@@ -28,7 +45,7 @@ public class InventoryClient {
      * GET /inventory/stock-by-lot?drugId=1&quantity=100&branchId=1
      */
     public String getStockByLotFefo(Long drugId, BigDecimal quantity, Long branchId) throws Exception {
-        String url = INVENTORY_SERVICE_URL + "/stock-by-lot?" +
+        String url = inventoryServiceUrl() + "/stock-by-lot?" +
                 "drugId=" + drugId +
                 "&quantity=" + quantity +
                 "&branchId=" + branchId;
@@ -42,7 +59,7 @@ public class InventoryClient {
      * POST /inventory/deduct
      */
     public String deductStock(Long drugId, Long branchId, String lotAllocationsJson) throws Exception {
-        String url = INVENTORY_SERVICE_URL + "/deduct";
+        String url = inventoryServiceUrl() + "/deduct";
         
         String requestBody = "{" +
                 "\"drugId\": " + drugId + "," +
@@ -57,7 +74,7 @@ public class InventoryClient {
      * Kiểm tra tồn kho đủ không
      */
     public String checkStockAvailability(Long drugId, BigDecimal quantity, Long branchId) throws Exception {
-        String url = INVENTORY_SERVICE_URL + "/check-availability?" +
+        String url = inventoryServiceUrl() + "/check-availability?" +
                 "drugId=" + drugId +
                 "&quantity=" + quantity +
                 "&branchId=" + branchId;
@@ -69,7 +86,7 @@ public class InventoryClient {
      * Lấy chi tiết tồn kho của một thuốc
      */
     public String getDrugInventory(Long drugId, Long branchId) throws Exception {
-        String url = INVENTORY_SERVICE_URL + "/drug/" + drugId + "/branch/" + branchId;
+        String url = inventoryServiceUrl() + "/drug/" + drugId + "/branch/" + branchId;
         return makeHttpGet(url);
     }
     
@@ -83,7 +100,7 @@ public class InventoryClient {
      * @return true nếu thành công
      */
     public boolean restoreStockByInvoiceId(Long branchId, Long invoiceId) throws Exception {
-        String url = INVENTORY_SERVICE_URL + "/restore-by-invoice/" + invoiceId + "?branchId=" + branchId;
+        String url = inventoryServiceUrl() + "/restore-by-invoice/" + invoiceId + "?branchId=" + branchId;
         
         String response = makeHttpPost(url, "{}");
         
@@ -93,6 +110,17 @@ public class InventoryClient {
     }
     
     // ========== Helper Methods ==========
+
+    private String inventoryServiceUrl() {
+        HealthService instance = resolver.resolve(serviceName)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No healthy Inventory Service instance is available"));
+        String prefix = apiPrefix.startsWith("/") ? apiPrefix : "/" + apiPrefix;
+        while (prefix.endsWith("/") && prefix.length() > 1) {
+            prefix = prefix.substring(0, prefix.length() - 1);
+        }
+        return ConsulServiceResolver.baseUrl(instance) + prefix;
+    }
     
     private String makeHttpGet(String urlString) throws Exception {
         URL url = new URL(urlString);
