@@ -10,9 +10,199 @@ GET     /health                             controllers.HealthController.health(
 GET     /health/detailed                    controllers.HealthController.detailedHealth()
 
 # ============================================================================
-# SALES SERVICE ENDPOINTS
+# SALES SERVICE ENDPOINTS - SHIFTS (Ca làm việc)
 # ============================================================================
-# TODO: Implement các endpoint này
+# UC-BH-08: Mở ca, chốt ca
+
+# Mở ca mới - POST /sales/shifts/open {userId, branchId, openingCash}
+POST    /shifts/open                        controllers.SalesShiftController.openShift(request: Request)
+
+# Chốt ca - POST /sales/shifts/{id}/close {actualClosingCash}
+POST    /shifts/:shiftId/close              controllers.SalesShiftController.closeShift(request: Request, shiftId: Long)
+
+# Lấy ca đang mở của user - GET /sales/shifts/current (header: X-User-Id, X-Branch-Id)
+GET     /shifts/current                     controllers.SalesShiftController.getCurrentShift(request: Request)
+
+# Lấy chi tiết shift - GET /sales/shifts/{id}
+GET     /shifts/:shiftId                    controllers.SalesShiftController.getShift(request: Request, shiftId: Long)
+
+# Tính chênh lệch tiền - GET /sales/shifts/{id}/cash-difference
+GET     /shifts/:shiftId/cash-difference    controllers.SalesShiftController.getCashDifference(request: Request, shiftId: Long)
+
+# Lấy lịch sử shifts của user - GET /sales/shifts/user/{userId}?page=1&size=20
+GET     /shifts/user/:userId                controllers.SalesShiftController.getUserShiftHistory(request: Request, userId: Long)
+
+# Lấy shifts mở của chi nhánh - GET /sales/shifts/branch/{branchId}/open
+GET     /shifts/branch/:branchId/open       controllers.SalesShiftController.getOpenShiftsByBranch(request: Request, branchId: Long)
+
+# Lấy shifts của chi nhánh theo ngày - GET /sales/shifts/branch/{branchId}/date?date=YYYY-MM-DD
+GET     /shifts/branch/:branchId/date       controllers.SalesShiftController.getShiftsByBranchAndDate(request: Request, branchId: Long)
+
+# ============================================================================
+# SALES SERVICE ENDPOINTS - INVOICE DETAILS (Chi tiết hóa đơn)
+# ============================================================================
+# UC-BH-02: Quản lý chi tiết dòng thuốc trong hóa đơn
+
+# Thêm chi tiết hóa đơn - POST /sales/invoice-details
+POST    /invoice-details/create             controllers.SalesInvoiceDetailController.createInvoiceDetail(request: Request)
+
+# Cập nhật chi tiết hóa đơn - PUT /sales/invoice-details/:id
+PUT     /invoice-details/:id                controllers.SalesInvoiceDetailController.updateInvoiceDetail(request: Request, id: Long)
+
+# Lấy chi tiết hóa đơn - GET /sales/invoice-details/:id
+GET     /invoice-details/:id                controllers.SalesInvoiceDetailController.getInvoiceDetail(request: Request, id: Long)
+
+# Xóa chi tiết hóa đơn - DELETE /sales/invoice-details/:id
+DELETE  /invoice-details/:id                controllers.SalesInvoiceDetailController.deleteInvoiceDetail(request: Request, id: Long)
+
+# Lấy tất cả chi tiết của hóa đơn - GET /sales/invoice-details/by-invoice/:invoiceId
+GET     /invoice-details/by-invoice/:invoiceId   controllers.SalesInvoiceDetailController.getInvoiceDetailsByInvoiceId(request: Request, invoiceId: Long)
+
+# Lấy tổng tiền hóa đơn - GET /sales/invoice-details/total/:invoiceId
+GET     /invoice-details/total/:invoiceId       controllers.SalesInvoiceDetailController.getInvoiceTotalAmount(request: Request, invoiceId: Long)
+
+# Lấy số lượng chi tiết hóa đơn - GET /sales/invoice-details/count/:invoiceId
+GET     /invoice-details/count/:invoiceId       controllers.SalesInvoiceDetailController.getInvoiceDetailCount(request: Request, invoiceId: Long)
+
+# Xóa tất cả chi tiết của hóa đơn - DELETE /sales/invoice-details/all/:invoiceId
+DELETE  /invoice-details/all/:invoiceId         controllers.SalesInvoiceDetailController.deleteAllInvoiceDetails(request: Request, invoiceId: Long)
+
+# ============================================================================
+# SALES SERVICE ENDPOINTS - SALES RETURNS (Phiếu trả hàng)
+# ============================================================================
+# UC-BH-07: Quản lý phiếu trả hàng
+
+# Lập phiếu trả mới - POST /sales/returns
+POST    /returns/create                 controllers.SalesReturnController.createSalesReturn(request: Request)
+
+# Lấy phiếu trả - GET /sales/returns/:id
+GET     /returns/:id                    controllers.SalesReturnController.getSalesReturn(request: Request, id: Long)
+
+# Lấy phiếu trả theo mã - GET /sales/returns/by-code/:code
+GET     /returns/by-code/:code          controllers.SalesReturnController.getSalesReturnByCode(request: Request, code: String)
+
+# Duyệt phiếu trả - POST /sales/returns/:id/approve
+POST    /returns/:id/approve            controllers.SalesReturnController.approveSalesReturn(request: Request, id: Long)
+
+# Hủy phiếu trả - POST /sales/returns/:id/cancel
+POST    /returns/:id/cancel             controllers.SalesReturnController.cancelSalesReturn(request: Request, id: Long)
+
+# Xóa phiếu trả - DELETE /sales/returns/:id
+DELETE  /returns/:id                    controllers.SalesReturnController.deleteSalesReturn(request: Request, id: Long)
+
+# Lấy phiếu trả của hóa đơn - GET /sales/returns/by-invoice/:invoiceId
+GET     /returns/by-invoice/:invoiceId  controllers.SalesReturnController.getSalesReturnsByInvoiceId(request: Request, invoiceId: Long)
+
+# Lấy phiếu trả của user - GET /sales/returns/by-user/:userId
+GET     /returns/by-user/:userId        controllers.SalesReturnController.getSalesReturnsByUserId(request: Request, userId: Long)
+
+# Lấy phiếu trả DRAFT - GET /sales/returns/draft/all
+GET     /returns/draft/all              controllers.SalesReturnController.getDraftSalesReturns(request: Request)
+
+# Lấy số lượng phiếu trả - GET /sales/returns/count/:invoiceId
+GET     /returns/count/:invoiceId       controllers.SalesReturnController.getSalesReturnCount(request: Request, invoiceId: Long)
+
+# ============================================================================
+# SALES SERVICE ENDPOINTS - PRESCRIPTIONS (Đơn thuốc)
+# ============================================================================
+# UC-BH-03: Quản lý đơn thuốc + Tích hợp Inventory API (trừ tồn FEFO)
+
+# Lập đơn thuốc mới - POST /sales/prescriptions/create
+POST    /prescriptions/create               controllers.SalesPrescriptionController.createPrescription(request: Request)
+
+# Lấy đơn thuốc - GET /sales/prescriptions/:id
+GET     /prescriptions/:id                  controllers.SalesPrescriptionController.getPrescription(request: Request, id: Long)
+
+# Lấy đơn thuốc theo mã - GET /sales/prescriptions/by-code/:code
+GET     /prescriptions/by-code/:code        controllers.SalesPrescriptionController.getPrescriptionByCode(request: Request, code: String)
+
+# Lấy đơn thuốc của khách hàng - GET /sales/prescriptions/by-customer/:customerId
+GET     /prescriptions/by-customer/:customerId   controllers.SalesPrescriptionController.getPrescriptionsByCustomerId(request: Request, customerId: Long)
+
+# Lấy đơn thuốc theo ngày - GET /sales/prescriptions/by-date/:date
+GET     /prescriptions/by-date/:date        controllers.SalesPrescriptionController.getPrescriptionsByDate(request: Request, date: String)
+
+# Xóa đơn thuốc - DELETE /sales/prescriptions/:id
+DELETE  /prescriptions/:id                  controllers.SalesPrescriptionController.deletePrescription(request: Request, id: Long)
+
+# Lấy số lượng đơn thuốc - GET /sales/prescriptions/count/:customerId
+GET     /prescriptions/count/:customerId    controllers.SalesPrescriptionController.getPrescriptionCount(request: Request, customerId: Long)
+
+# Trừ tồn kho theo FEFO (Tích hợp Inventory API) - POST /sales/prescriptions/:prescriptionId/deduct-stock
+POST    /prescriptions/:prescriptionId/deduct-stock     controllers.SalesPrescriptionController.deductStockByFefo(request: Request, prescriptionId: Long)
+
+# ============================================================================
+# SALES SERVICE ENDPOINTS - INVOICES (Hóa đơn) + Cancel/Returns
+# ============================================================================
+# UC-BH-04: Hủy hóa đơn, Trả hàng
+
+# Lập hóa đơn mới - POST /sales/invoices/create
+POST    /invoices/create                    controllers.SalesInvoiceController.createInvoice(request: Request)
+
+# Lấy hóa đơn theo ID - GET /sales/invoices/:invoiceId
+GET     /invoices/:invoiceId                controllers.SalesInvoiceController.getInvoiceById(request: Request, invoiceId: Long)
+
+# Lấy hóa đơn theo code - GET /sales/invoices/code/:code
+GET     /invoices/code/:code                controllers.SalesInvoiceController.getInvoiceByCode(request: Request, code: String)
+
+# Lấy lịch sử hóa đơn của customer - GET /sales/invoices/by-customer/:customerId?page=1&pageSize=20
+GET     /invoices/by-customer/:customerId   controllers.SalesInvoiceController.getInvoicesByCustomerId(request: Request, customerId: Long)
+
+# Lấy hóa đơn theo status - GET /sales/invoices/by-status/:status?page=1&pageSize=20
+GET     /invoices/by-status/:status         controllers.SalesInvoiceController.getInvoicesByStatus(request: Request, status: String)
+
+# Lấy hóa đơn theo chi nhánh & ngày - GET /sales/invoices/by-branch/:branchId/date/:date (format: YYYY-MM-DD)
+GET     /invoices/by-branch/:branchId/date/:date       controllers.SalesInvoiceController.getInvoicesByBranchAndDate(request: Request, branchId: Long, date: String)
+
+# Hủy hóa đơn (HỦY HÓA ĐƠN API - Tích hợp Inventory) - POST /sales/invoices/:invoiceId/cancel
+POST    /invoices/:invoiceId/cancel        controllers.SalesInvoiceController.cancelInvoice(request: Request, invoiceId: Long)
+
+# Kiểm tra có thể hủy hóa đơn không - GET /sales/invoices/:invoiceId/can-cancel
+GET     /invoices/:invoiceId/can-cancel    controllers.SalesInvoiceController.canCancelInvoice(request: Request, invoiceId: Long)
+
+# Kiểm tra có thể trả hàng không - GET /sales/invoices/:invoiceId/can-return
+GET     /invoices/:invoiceId/can-return    controllers.SalesInvoiceController.canReturnInvoice(request: Request, invoiceId: Long)
+
+# Doanh thu theo ngày - GET /sales/invoices/branch/:branchId/revenue/date/:date
+GET     /invoices/branch/:branchId/revenue/date/:date  controllers.SalesInvoiceController.getTotalRevenueByDate(request: Request, branchId: Long, date: String)
+
+# Danh sách hóa đơn theo status (phân trang) - GET /sales/invoices/status/:status/list?page=1&pageSize=20
+GET     /invoices/status/:status/list      controllers.SalesInvoiceController.getInvoicesByStatusPaginated(request: Request, status: String)
+
+# ============================================================================
+# SALES SERVICE ENDPOINTS - REVENUE & PROFIT (Doanh thu & Lợi nhuận)
+# ============================================================================
+# FR-BH-01: Báo cáo doanh thu, lợi nhuận
+
+# Doanh thu theo ngày - GET /sales/revenue/daily/branch/{branchId}/date/{date}
+GET     /revenue/daily/branch/:branchId/date/:date     controllers.SalesRevenueController.getDailyRevenue(request: Request, branchId: Long, date: String)
+
+# Lợi nhuận theo ngày - GET /sales/revenue/daily-profit/branch/{branchId}/date/{date}
+GET     /revenue/daily-profit/branch/:branchId/date/:date     controllers.SalesRevenueController.getDailyProfit(request: Request, branchId: Long, date: String)
+
+# Doanh thu theo tuần - GET /sales/revenue/weekly/branch/{branchId}/start-date/{date}
+GET     /revenue/weekly/branch/:branchId/start-date/:date     controllers.SalesRevenueController.getWeeklyRevenue(request: Request, branchId: Long, date: String)
+
+# Doanh thu theo tháng - GET /sales/revenue/monthly/branch/{branchId}/year/{year}/month/{month}
+GET     /revenue/monthly/branch/:branchId/year/:year/month/:month     controllers.SalesRevenueController.getMonthlyRevenue(request: Request, branchId: Long, year: Int, month: Int)
+
+# Doanh thu trong khoảng ngày - GET /sales/revenue/range/branch/{branchId}/from/{startDate}/to/{endDate}
+GET     /revenue/range/branch/:branchId/from/:startDate/to/:endDate     controllers.SalesRevenueController.getRevenueByDateRange(request: Request, branchId: Long, startDate: String, endDate: String)
+
+# Doanh thu theo user & ngày - GET /sales/revenue/user/{userId}/date/{date}
+GET     /revenue/user/:userId/date/:date     controllers.SalesRevenueController.getUserRevenue(request: Request, userId: Long, date: String)
+
+# Doanh thu theo shift - GET /sales/revenue/shift/{shiftId}
+GET     /revenue/shift/:shiftId     controllers.SalesRevenueController.getShiftRevenue(request: Request, shiftId: Long)
+
+# Margin% doanh thu - GET /sales/revenue/margin/branch/{branchId}/date/{date}
+GET     /revenue/margin/branch/:branchId/date/:date     controllers.SalesRevenueController.getRevenueMargin(request: Request, branchId: Long, date: String)
+
+# Top users theo doanh thu - GET /sales/revenue/top-users/branch/{branchId}/date/{date}?limit=10
+GET     /revenue/top-users/branch/:branchId/date/:date     controllers.SalesRevenueController.getTopUsersByRevenue(request: Request, branchId: Long, date: String)
+
+# Snapshot báo cáo theo ngày - GET /sales/revenue/snapshot/branch/{branchId}/date/{date}
+GET     /revenue/snapshot/branch/:branchId/date/:date     controllers.SalesRevenueController.getDailySnapshot(request: Request, branchId: Long, date: String)
 
 # An example controller showing a sample home page
 GET     /                           controllers.HomeController.index()
