@@ -327,12 +327,25 @@ curl http://localhost:9000/metrics | head -20
 | POST | /inventory/transfers | Lập phiếu chuyển kho |
 | POST | /inventory/internal/deduct | Trừ tồn theo FEFO (internal) |
 
-#### Purchase Service (/api/v1/purchase)
+#### Purchase Service (qua API Gateway: `/purchase`)
 
 | Method | Endpoint | Mô tả |
 |--------|----------|-------|
-| POST | /purchase/receipts | Lập phiếu nhập |
-| GET | /purchase/debts | Công nợ nhà cung cấp |
+| POST, GET | /purchase-orders | Tạo và tra cứu đơn đặt hàng |
+| GET, PUT, DELETE | /purchase-orders/:id | Xem, cập nhật, hủy đơn đặt hàng |
+| GET, POST | /purchase-orders/:id/details | Tra cứu và thêm chi tiết đơn đặt hàng |
+| PUT, DELETE | /purchase-orders/:id/details/:detailId | Cập nhật, xóa chi tiết đơn đặt hàng |
+| POST, GET | /purchase-receipts | Tạo và tra cứu phiếu nhập (lọc `fromDate`, `toDate`, `supplierId`, `status`) |
+| GET, PUT | /purchase-receipts/:id | Xem và cập nhật phiếu nhập |
+| PATCH | /purchase-receipts/:id/status | Chuyển trạng thái phiếu nhập |
+| GET, POST | /purchase-receipts/:receiptId/details | Tra cứu, thêm chi tiết phiếu nhập |
+| PUT, DELETE | /purchase-receipts/:receiptId/details/:detailId | Cập nhật, xóa chi tiết phiếu nhập |
+| POST, GET | /supplier-returns | Tạo và tra cứu phiếu trả nhà cung cấp |
+| GET | /supplier-returns/:id/details | Tra cứu chi tiết phiếu trả |
+| POST | /supplier-returns/:id/confirm, /supplier-returns/:id/cancel | Xác nhận hoặc hủy phiếu trả |
+| POST, GET | /supplier-payments | Tạo và tra cứu thanh toán nhà cung cấp |
+| GET | /supplier-payments/:id | Xem thanh toán |
+| GET | /supplier-debt/:supplierId | Tra cứu công nợ nhà cung cấp |
 
 #### Sales Service (/api/v1/sales)
 
