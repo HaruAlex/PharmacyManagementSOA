@@ -1,53 +1,56 @@
-# Routes
-# This file defines all application routes (Higher priority routes first)
-# ~~~~
+# Health and metrics stay local and do not require authentication.
+GET     /health                         controllers.MetricsController.health()
+GET     /healthz                        controllers.MetricsController.healthz()
+GET     /metrics                        controllers.MetricsController.metrics()
 
-# ============================================================================
-# SERVICE ROUTING - LOAD BALANCED (Đợt 2+)
-# ============================================================================
-# Gateway forward requests tới microservices qua Consul service discovery + load balancing
+# Public service prefixes are mapped in application.conf.
+GET     /api                            controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+POST    /api                            controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+PUT     /api                            controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+PATCH   /api                            controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+DELETE  /api                            controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+OPTIONS /api                            controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
 
-GET     /auth/*path                         controllers.GatewayController.proxyAuth(path)
-POST    /auth/*path                         controllers.GatewayController.proxyAuth(path)
-PUT     /auth/*path                         controllers.GatewayController.proxyAuth(path)
-DELETE  /auth/*path                         controllers.GatewayController.proxyAuth(path)
+GET     /api/*path                      controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+POST    /api/*path                      controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+PUT     /api/*path                      controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+PATCH   /api/*path                      controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+DELETE  /api/*path                      controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+HEAD    /api/*path                      controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+OPTIONS /api/*path                      controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
 
-GET     /catalog/*path                      controllers.GatewayController.proxyCatalog(path)
-POST    /catalog/*path                      controllers.GatewayController.proxyCatalog(path)
-PUT     /catalog/*path                      controllers.GatewayController.proxyCatalog(path)
-DELETE  /catalog/*path                      controllers.GatewayController.proxyCatalog(path)
+GET     /catalog                        controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+POST    /catalog                        controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+PUT     /catalog                        controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+PATCH   /catalog                        controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+DELETE  /catalog                        controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
+OPTIONS /catalog                        controllers.GatewayController.proxyRoot(request: play.mvc.Http.Request)
 
-GET     /inventory/*path                    controllers.GatewayController.proxyInventory(path)
-POST    /inventory/*path                    controllers.GatewayController.proxyInventory(path)
-PUT     /inventory/*path                    controllers.GatewayController.proxyInventory(path)
-DELETE  /inventory/*path                    controllers.GatewayController.proxyInventory(path)
+GET     /catalog/*path                  controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+POST    /catalog/*path                  controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+PUT     /catalog/*path                  controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+PATCH   /catalog/*path                  controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+DELETE  /catalog/*path                  controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+HEAD    /catalog/*path                  controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+OPTIONS /catalog/*path                  controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
 
-GET     /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
-POST    /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
-PUT     /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
-PATCH   /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
-DELETE  /purchase/*path                     controllers.GatewayController.proxyPurchase(request: play.mvc.Http.Request, path)
+GET     /report/*path                   controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+POST    /report/*path                   controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+PUT     /report/*path                   controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+PATCH   /report/*path                   controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+DELETE  /report/*path                   controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+HEAD    /report/*path                   controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
+OPTIONS /report/*path                   controllers.GatewayController.proxy(request: play.mvc.Http.Request, path: String)
 
-GET     /sales/*path                        controllers.GatewayController.proxySales(path)
-POST    /sales/*path                        controllers.GatewayController.proxySales(path)
-PUT     /sales/*path                        controllers.GatewayController.proxySales(path)
-DELETE  /sales/*path                        controllers.GatewayController.proxySales(path)
+# The home page and assets retain their existing handlers.
+GET     /                               controllers.HomeController.index()
+GET     /assets/*file                   controllers.Assets.versioned(path="/public", file: Asset)
 
-GET     /report/*path                       controllers.GatewayController.proxyReport(path)
-POST    /report/*path                       controllers.GatewayController.proxyReport(path)
-PUT     /report/*path                       controllers.GatewayController.proxyReport(path)
-DELETE  /report/*path                       controllers.GatewayController.proxyReport(path)
-
-# ============================================================================
-# HEALTH CHECK ENDPOINTS (Đợt 6)
-# ============================================================================
-# Dùng cho monitoring API Gateway
-GET     /health                             controllers.MetricsController.health()
-GET     /healthz                            controllers.MetricsController.healthz()
-GET     /metrics                            controllers.MetricsController.metrics()
-
-# An example controller showing a sample home page
-GET     /                           controllers.HomeController.index()
-
-# Map static resources from the /public folder to the /assets URL path
-GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
+# Return the standard JSON error for unmatched paths.
+GET     /*path                          controllers.GatewayController.notFound(request: play.mvc.Http.Request, path: String)
+POST    /*path                          controllers.GatewayController.notFound(request: play.mvc.Http.Request, path: String)
+PUT     /*path                          controllers.GatewayController.notFound(request: play.mvc.Http.Request, path: String)
+PATCH   /*path                          controllers.GatewayController.notFound(request: play.mvc.Http.Request, path: String)
+DELETE  /*path                          controllers.GatewayController.notFound(request: play.mvc.Http.Request, path: String)
+OPTIONS /*path                          controllers.GatewayController.notFound(request: play.mvc.Http.Request, path: String)
+HEAD    /*path                          controllers.GatewayController.notFound(request: play.mvc.Http.Request, path: String)
