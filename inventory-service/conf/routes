@@ -22,9 +22,6 @@ GET     /assets/*file               controllers.Assets.versioned(path="/public",
 
 
 
-
-# API xem danh sach ton kho (ho tro loc theo ?keyword=...)
-GET     /api/inventory                  controllers.InventoryController.getStocks(request: Request)
-
-# API xem chi tiet ton kho theo ma thuoc
-GET     /api/inventory/:medicineId      controllers.InventoryController.getStockByMedicineId(medicineId: String)
+# Routes cho Inventory Inquiry API - Stock By Lot (BE-28)
+GET     /api/inventory/lots                 controllers.InventoryController.getStockByLots(keyword: String ?= null)
+GET     /api/inventory/lots/:medicineId     controllers.InventoryController.getStockByMedicineId(medicineId: String)

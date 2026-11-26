@@ -1,61 +1,123 @@
-package repositories;
+﻿package repositories;
 
-import models.MedicineStock;
+import models.StockLot;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Repository truy xuat du lieu ton kho thuoc cho BE-28.
- * Dung du lieu mau trong bo nho (khong can SQL Server) de chay API va unit test.
+ * Repository truy xuất dữ liệu tồn kho theo từng lô thuốc (Stock By Lot) cho BE-28.
+ * Hiện sử dụng dữ liệu mẫu trong bộ nhớ khi chưa kết nối SQL Server thật.
  */
 @Singleton
 public class InventoryRepository {
 
-    // Danh sach thuoc mau phuc vu test API va unit test
-    private final List<MedicineStock> sampleStocks;
+    // Danh sách các lô thuốc mẫu phục vụ chạy API và unit test
+    private final List<StockLot> sampleLots;
 
     @Inject
     public InventoryRepository() {
-        this.sampleStocks = List.of(
-                new MedicineStock("MED-01", "Paracetamol 500mg", "Hop", 15, 20, Instant.parse("2026-11-20T08:00:00Z")),
-                new MedicineStock("MED-02", "Amoxicillin 500mg", "Vi", 120, 30, Instant.parse("2026-11-21T09:30:00Z")),
-                new MedicineStock("MED-03", "Vitamin C 1000mg", "Chai", 8, 15, Instant.parse("2026-11-22T14:15:00Z")),
-                new MedicineStock("MED-04", "Omeprazole 20mg", "Hop", 65, 25, Instant.parse("2026-11-23T10:00:00Z"))
+        this.sampleLots = List.of(
+                new StockLot(
+                        "LOT-PARA-01",
+                        "MED-01",
+                        "Paracetamol 500mg",
+                        "Hop",
+                        15,
+                        20,
+                        LocalDate.parse("2027-06-30"),
+                        Instant.parse("2026-11-20T08:00:00Z")
+                ),
+                new StockLot(
+                        "LOT-PARA-02",
+                        "MED-01",
+                        "Paracetamol 500mg",
+                        "Hop",
+                        45,
+                        20,
+                        LocalDate.parse("2027-12-15"),
+                        Instant.parse("2026-11-22T09:00:00Z")
+                ),
+                new StockLot(
+                        "LOT-AMOX-01",
+                        "MED-02",
+                        "Amoxicillin 500mg",
+                        "Vi",
+                        120,
+                        30,
+                        LocalDate.parse("2027-09-01"),
+                        Instant.parse("2026-11-21T09:30:00Z")
+                ),
+                new StockLot(
+                        "LOT-VITC-01",
+                        "MED-03",
+                        "Vitamin C 1000mg",
+                        "Chai",
+                        8,
+                        15,
+                        LocalDate.parse("2026-10-01"),
+                        Instant.parse("2026-11-22T14:15:00Z")
+                ),
+                new StockLot(
+                        "LOT-OMEP-01",
+                        "MED-04",
+                        "Omeprazole 20mg",
+                        "Hop",
+                        65,
+                        25,
+                        LocalDate.parse("2028-03-20"),
+                        Instant.parse("2026-11-23T10:00:00Z")
+                )
         );
     }
 
     /**
-     * Lay danh sach ton kho, loc theo keyword (ma hoac ten thuoc) va sap xep theo ten.
+     * Lấy danh sách tồn kho theo lô, hỗ trợ lọc theo keyword (mã lô, mã thuốc hoặc tên thuốc)
+     * và sắp xếp ưu tiên hạn sử dụng gần nhất rồi tới tên thuốc.
      */
-    public List<MedicineStock> findAll(String keyword) {
+    public List<StockLot> findAllLots(String keyword) {
         String normalizedKeyword = keyword == null ? "" : keyword.trim().toLowerCase(Locale.ROOT);
 
-        return sampleStocks.stream()
-                .filter(stock -> normalizedKeyword.isEmpty()
-                        || (stock.getMedicineId() != null && stock.getMedicineId().toLowerCase(Locale.ROOT).contains(normalizedKeyword))
-                        || (stock.getMedicineName() != null && stock.getMedicineName().toLowerCase(Locale.ROOT).contains(normalizedKeyword)))
-                .sorted(Comparator.comparing(MedicineStock::getMedicineName, Comparator.nullsLast(String::compareToIgnoreCase)))
+        return sampleLots.stream()
+                .filter(lot -> normalizedKeyword.isEmpty()
+                        || (lot.getLotNumber() != null
+                        && lot.getLotNumber().toLowerCase(Locale.ROOT).contains(normalizedKeyword))
+                        || (lot.getMedicineId() != null
+                        && lot.getMedicineId().toLowerCase(Locale.ROOT).contains(normalizedKeyword))
+                        || (lot.getMedicineName() != null
+                        && lot.getMedicineName().toLowerCase(Locale.ROOT).contains(normalizedKeyword)))
+                .sorted(Comparator.comparing(
+                        StockLot::getExpiryDate,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ).thenComparing(
+                        StockLot::getMedicineName,
+                        Comparator.nullsLast(String::compareToIgnoreCase)
+                ))
                 .collect(Collectors.toList());
     }
 
     /**
-     * Tim chi tiet ton kho theo ma thuoc (khong phan biet hoa thuong).
+     * Lấy toàn bộ các lô tồn kho thuộc một mã thuốc cụ thể (không phân biệt chữ hoa/thường).
      */
-    public Optional<MedicineStock> findByMedicineId(String medicineId) {
+    public List<StockLot> findLotsByMedicineId(String medicineId) {
         if (medicineId == null || medicineId.trim().isEmpty()) {
-            return Optional.empty();
+            return List.of();
         }
-        String targetId = medicineId.trim();
+        String targetMedicineId = medicineId.trim();
 
-        return sampleStocks.stream()
-                .filter(stock -> stock.getMedicineId() != null && targetId.equalsIgnoreCase(stock.getMedicineId()))
-                .findFirst();
+        return sampleLots.stream()
+                .filter(lot -> lot.getMedicineId() != null
+                        && targetMedicineId.equalsIgnoreCase(lot.getMedicineId()))
+                .sorted(Comparator.comparing(
+                        StockLot::getExpiryDate,
+                        Comparator.nullsLast(Comparator.naturalOrder())
+                ))
+                .collect(Collectors.toList());
     }
 }
