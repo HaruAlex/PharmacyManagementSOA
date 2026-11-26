@@ -25,3 +25,14 @@ GET     /assets/*file               controllers.Assets.versioned(path="/public",
 # Routes cho Inventory Inquiry API - Stock By Lot (BE-28)
 GET     /api/inventory/lots                 controllers.InventoryController.getStockByLots(keyword: String ?= null)
 GET     /api/inventory/lots/:medicineId     controllers.InventoryController.getStockByMedicineId(medicineId: String)
+
+
+
+# Đường dẫn quản lý lô thuốc (BE-29)
+
+# Lấy danh sách lô thuốc theo chi nhánh (đọc từ header X-Branch-Id), có lọc, phân trang và sắp xếp.
+# Các tham số tùy chọn dùng kiểu Java và mặc định null nếu không truyền.
+GET     /api/drug-lots              controllers.DrugLotController.getLots(request: Request, drugId: java.lang.Long ?= null, status: String ?= null, page: Int ?= 0, size: Int ?= 20, sort: String ?= null)
+
+# Lấy thông tin chi tiết của một lô thuốc theo ID trong phạm vi chi nhánh hiện hành.
+GET     /api/drug-lots/:id          controllers.DrugLotController.getLotDetail(request: Request, id: Long)
