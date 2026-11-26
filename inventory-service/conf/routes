@@ -19,3 +19,32 @@ GET     /                           controllers.HomeController.index()
 
 # Map static resources from the /public folder to the /assets URL path
 GET     /assets/*file               controllers.Assets.versioned(path="/public", file: Asset)
+
+
+
+# Routes cho Inventory Inquiry API - Stock By Lot (BE-28)
+GET     /api/inventory/lots                 controllers.InventoryController.getStockByLots(keyword: String ?= null)
+GET     /api/inventory/lots/:medicineId     controllers.InventoryController.getStockByMedicineId(medicineId: String)
+
+
+
+# Đường dẫn quản lý lô thuốc (BE-29)
+
+# Lấy danh sách lô thuốc theo chi nhánh (đọc từ header X-Branch-Id), có lọc, phân trang và sắp xếp.
+# Các tham số tùy chọn dùng kiểu Java và mặc định null nếu không truyền.
+GET     /api/drug-lots              controllers.DrugLotController.getLots(request: Request, drugId: java.lang.Long ?= null, status: String ?= null, page: Int ?= 0, size: Int ?= 20, sort: String ?= null)
+
+# Lấy thông tin chi tiết của một lô thuốc theo ID trong phạm vi chi nhánh hiện hành.
+GET     /api/drug-lots/:id          controllers.DrugLotController.getLotDetail(request: Request, id: Long)
+
+
+
+# Stock Ledger (BE-30 / FR-KH-03)
+GET   /api/v1/inventory/ledger   controllers.StockLedgerController.getLedger(request: Request, drugId: Integer ?= null, lotId: Integer ?= null, type: String ?= null, from: String ?= null, to: String ?= null, page: Int ?= 1, size: Int ?= 20, sort: String ?= "createdAt,desc")
+
+
+
+# API chuyen kho (BE 31)
+POST    /api/v1/inventory/transfers          controllers.StockTransferController.createTransfer(request: Request)
+GET     /api/v1/inventory/transfers          controllers.StockTransferController.listTransfers(request: Request, targetBranchId: Integer ?= null, status: String ?= null, page: Int ?= 1, size: Int ?= 20, sort: String ?= "createdAt,desc")
+GET     /api/v1/inventory/transfers/:id      controllers.StockTransferController.getTransferById(request: Request, id: Long)
