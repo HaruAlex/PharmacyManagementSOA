@@ -36,3 +36,8 @@ GET     /api/drug-lots              controllers.DrugLotController.getLots(reques
 
 # Lấy thông tin chi tiết của một lô thuốc theo ID trong phạm vi chi nhánh hiện hành.
 GET     /api/drug-lots/:id          controllers.DrugLotController.getLotDetail(request: Request, id: Long)
+
+
+
+# Stock Ledger (BE-30 / FR-KH-03)
+GET   /api/v1/inventory/ledger   controllers.StockLedgerController.getLedger(request: Request, drugId: Integer ?= null, lotId: Integer ?= null, type: String ?= null, from: String ?= null, to: String ?= null, page: Int ?= 1, size: Int ?= 20, sort: String ?= "createdAt,desc")
