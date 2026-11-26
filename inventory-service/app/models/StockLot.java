@@ -1,4 +1,4 @@
-﻿package models;
+package models;
 
 import java.time.Instant;
 import java.time.LocalDate;
