@@ -15,6 +15,7 @@ libraryDependencies += "com.ecwid.consul" % "consul-api" % "1.4.5"
 // Database
 libraryDependencies += "com.microsoft.sqlserver" % "mssql-jdbc" % "12.2.0.jre11"
 libraryDependencies += javaJdbc
+libraryDependencies += "com.h2database" % "h2" % "2.3.232" % Test
 
 // Excel/CSV Processing
 libraryDependencies += "org.apache.poi" % "poi" % "5.2.3"
