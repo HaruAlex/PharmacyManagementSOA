@@ -12,7 +12,37 @@ GET     /health/detailed                    controllers.HealthController.detaile
 # ============================================================================
 # PURCHASE SERVICE ENDPOINTS
 # ============================================================================
-# TODO: Implement các endpoint này
+POST    /purchase-orders                              controllers.PurchaseController.createPurchaseOrder(request: play.mvc.Http.Request)
+GET     /purchase-orders                              controllers.PurchaseController.listPurchaseOrders(request: play.mvc.Http.Request)
+GET     /purchase-orders/:id                          controllers.PurchaseController.getPurchaseOrder(id: Long)
+GET     /purchase-orders/:id/details                 controllers.PurchaseController.getPurchaseOrderDetails(id: Long)
+POST    /purchase-orders/:id/details                 controllers.PurchaseController.addPurchaseOrderDetail(request: play.mvc.Http.Request, id: Long)
+PUT     /purchase-orders/:id/details/:detailId       controllers.PurchaseController.updatePurchaseOrderDetail(request: play.mvc.Http.Request, id: Long, detailId: Long)
+DELETE  /purchase-orders/:id/details/:detailId       controllers.PurchaseController.deletePurchaseOrderDetail(id: Long, detailId: Long)
+PUT     /purchase-orders/:id                          controllers.PurchaseController.updatePurchaseOrder(request: play.mvc.Http.Request, id: Long)
+DELETE  /purchase-orders/:id                          controllers.PurchaseController.cancelPurchaseOrder(id: Long)
+
+POST    /purchase-receipts                           controllers.PurchaseController.createReceipt(request: play.mvc.Http.Request)
+GET     /purchase-receipts                           controllers.PurchaseController.listReceipts(request: play.mvc.Http.Request)
+GET     /purchase-receipts/:id                       controllers.PurchaseController.getReceipt(id: Long)
+PUT     /purchase-receipts/:id                       controllers.PurchaseController.updateReceipt(request: play.mvc.Http.Request, id: Long)
+PATCH   /purchase-receipts/:id/status               controllers.PurchaseController.transitionReceipt(request: play.mvc.Http.Request, id: Long)
+POST    /purchase-receipts/:receiptId/details       controllers.PurchaseController.addReceiptDetail(request: play.mvc.Http.Request, receiptId: Long)
+GET     /purchase-receipts/:receiptId/details       controllers.PurchaseController.getReceiptDetails(receiptId: Long)
+PUT     /purchase-receipts/:receiptId/details/:detailId controllers.PurchaseController.updateReceiptDetail(request: play.mvc.Http.Request, receiptId: Long, detailId: Long)
+DELETE  /purchase-receipts/:receiptId/details/:detailId controllers.PurchaseController.deleteReceiptDetail(receiptId: Long, detailId: Long)
+
+POST    /supplier-returns                            controllers.PurchaseController.createSupplierReturn(request: play.mvc.Http.Request)
+GET     /supplier-returns                            controllers.PurchaseController.listSupplierReturns(request: play.mvc.Http.Request)
+GET     /supplier-returns/:id                        controllers.PurchaseController.getSupplierReturn(id: Long)
+GET     /supplier-returns/:id/details                controllers.PurchaseController.getSupplierReturnDetails(id: Long)
+POST    /supplier-returns/:id/confirm               controllers.PurchaseController.confirmSupplierReturn(request: play.mvc.Http.Request, id: Long)
+POST    /supplier-returns/:id/cancel                controllers.PurchaseController.cancelSupplierReturn(id: Long)
+
+POST    /supplier-payments                           controllers.PurchaseController.createSupplierPayment(request: play.mvc.Http.Request)
+GET     /supplier-payments                           controllers.PurchaseController.listSupplierPayments(request: play.mvc.Http.Request)
+GET     /supplier-payments/:id                       controllers.PurchaseController.getSupplierPayment(id: Long)
+GET     /supplier-debt/:supplierId                   controllers.PurchaseController.getSupplierDebt(supplierId: Integer)
 
 # An example controller showing a sample home page
 GET     /                           controllers.HomeController.index()
