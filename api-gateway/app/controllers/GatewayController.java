@@ -43,8 +43,8 @@ public class GatewayController extends Controller {
         return proxyToService("inventory-service", path);
     }
     
-    public CompletionStage<Result> proxyPurchase(String path) {
-        return proxyToService("purchase-service", path);
+    public CompletionStage<Result> proxyPurchase(Http.Request request, String path) {
+        return proxyPurchaseWithRetry(request, "purchase-service", path, 0);
     }
     
     public CompletionStage<Result> proxySales(String path) {
@@ -60,6 +60,51 @@ public class GatewayController extends Controller {
      */
     private CompletionStage<Result> proxyToService(String serviceName, String path) {
         return proxyWithRetry(serviceName, path, 0);
+    }
+
+    private CompletionStage<Result> proxyPurchaseWithRetry(Http.Request request, String serviceName, String path, int attempt) {
+        if (attempt > 2) {
+            return CompletableFuture.completedFuture(
+                Results.status(503, "{\"error\":\"All instances unavailable after 3 attempts\"}").as("application/json")
+            );
+        }
+        try {
+            List<CatalogService> services = consulClient.getCatalogService(serviceName, QueryParams.DEFAULT).getValue();
+            if (services == null || services.isEmpty()) {
+                return CompletableFuture.completedFuture(
+                    Results.status(503, "{\"error\":\"Service " + serviceName + " not found in Consul\"}").as("application/json")
+                );
+            }
+            CatalogService selected = services.get(random.nextInt(services.size()));
+            String url = String.format("http://%s:%d/%s",
+                selected.getServiceAddress(),
+                selected.getServicePort(),
+                path);
+            if (request.uri().contains("?")) {
+                String query = request.uri().substring(request.uri().indexOf('?') + 1);
+                if (!query.isBlank()) url += "?" + query;
+            }
+            String method = request.method();
+            com.fasterxml.jackson.databind.JsonNode body = request.body().asJson();
+            play.libs.ws.WSRequest wsRequest = wsClient.url(url).setRequestTimeout(5000);
+            if (body != null) wsRequest.setContentType("application/json").setBody(body);
+            CompletionStage<WSResponse> responseStage;
+            if ("POST".equalsIgnoreCase(method)) responseStage = wsRequest.post(body);
+            else if ("PUT".equalsIgnoreCase(method)) responseStage = wsRequest.put(body);
+            else if ("PATCH".equalsIgnoreCase(method)) responseStage = wsRequest.patch(body);
+            else if ("DELETE".equalsIgnoreCase(method)) responseStage = wsRequest.delete();
+            else responseStage = wsRequest.get();
+            return responseStage
+                .thenApply(wsResponse -> Results.status(wsResponse.getStatus(), wsResponse.getBody())
+                    .as("application/json")
+                    .withHeader("X-Served-By", selected.getServiceId()))
+                .exceptionally(e -> proxyPurchaseWithRetry(request, serviceName, path, attempt + 1)
+                    .toCompletableFuture().join());
+        } catch (Exception e) {
+            return CompletableFuture.completedFuture(
+                Results.status(500, "{\"error\":\"Gateway error: " + e.getMessage() + "\"}").as("application/json")
+            );
+        }
     }
     
     /**
