@@ -71,7 +71,7 @@ public class InvoiceDetailRepository {
                 }
             }
         } catch (SQLException e) {
-            e.printStackTrace();
+            throw new RuntimeException("Failed to load invoice details for invoice " + invoiceId, e);
         }
         return details;
     }

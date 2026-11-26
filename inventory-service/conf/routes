@@ -42,6 +42,9 @@ GET     /api/drug-lots/:id          controllers.DrugLotController.getLotDetail(r
 # Stock Ledger (BE-30 / FR-KH-03)
 GET   /api/v1/inventory/ledger   controllers.StockLedgerController.getLedger(request: Request, drugId: Integer ?= null, lotId: Integer ?= null, type: String ?= null, from: String ?= null, to: String ?= null, page: Int ?= 1, size: Int ?= 20, sort: String ?= "createdAt,desc")
 
+# Sales stock operations use the canonical inventory tables and are idempotent per invoice.
+POST  /api/v1/inventory/sales/deduct                   controllers.SalesStockController.deductInvoice(request: Request)
+POST  /api/v1/inventory/sales/restore/:invoiceId       controllers.SalesStockController.restoreInvoice(request: Request, invoiceId: Long)
 
 
 # API chuyen kho (BE 31)

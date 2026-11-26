@@ -349,14 +349,53 @@ public class InvoiceRepository {
      * Cancel an invoice by setting status to CANCELLED
      */
     public boolean cancel(Long invoiceId) {
+        return cancel(invoiceId, InvoiceStatus.COMPLETED);
+    }
+
+    public boolean cancel(Long invoiceId, InvoiceStatus expectedStatus) {
         return db.withConnection(conn -> {
-            String sql = "UPDATE sales.Invoices SET Status = 'CANCELLED' WHERE InvoiceId = ?";
+            String sql = "UPDATE sales.Invoices SET Status = 'CANCELLED' " +
+                    "WHERE InvoiceId = ? AND Status = ?";
             
             try (var stmt = conn.prepareStatement(sql)) {
                 stmt.setLong(1, invoiceId);
+                stmt.setString(2, expectedStatus.name());
                 
                 int rowsAffected = stmt.executeUpdate();
                 return rowsAffected > 0;
+            }
+        });
+    }
+
+    public boolean beginProcessing(Long invoiceId) {
+        return db.withConnection(conn -> {
+            String sql = "UPDATE sales.Invoices SET Status = 'PROCESSING' " +
+                    "WHERE InvoiceId = ? AND Status = 'DRAFT'";
+            try (var stmt = conn.prepareStatement(sql)) {
+                stmt.setLong(1, invoiceId);
+                return stmt.executeUpdate() > 0;
+            }
+        });
+    }
+
+    public boolean completeProcessing(Long invoiceId) {
+        return db.withConnection(conn -> {
+            String sql = "UPDATE sales.Invoices SET Status = 'COMPLETED' " +
+                    "WHERE InvoiceId = ? AND Status = 'PROCESSING'";
+            try (var stmt = conn.prepareStatement(sql)) {
+                stmt.setLong(1, invoiceId);
+                return stmt.executeUpdate() > 0;
+            }
+        });
+    }
+
+    public boolean returnToDraft(Long invoiceId) {
+        return db.withConnection(conn -> {
+            String sql = "UPDATE sales.Invoices SET Status = 'DRAFT' " +
+                    "WHERE InvoiceId = ? AND Status = 'PROCESSING'";
+            try (var stmt = conn.prepareStatement(sql)) {
+                stmt.setLong(1, invoiceId);
+                return stmt.executeUpdate() > 0;
             }
         });
     }

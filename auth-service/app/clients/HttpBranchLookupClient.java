@@ -86,15 +86,16 @@ public class HttpBranchLookupClient implements BranchLookupClient {
         if (body == null || !body.isObject()) {
             throw new IllegalStateException("Catalog Service response must be a JSON object");
         }
-        JsonNode branchIds = body.get("branchIds");
-        if (branchIds == null || !branchIds.isArray()) {
+        JsonNode branches = body.get("items");
+        if (branches == null || !branches.isArray()) {
             throw new IllegalStateException(
-                    "Catalog Service response must contain a branchIds array");
+                    "Catalog Service response must contain an items array");
         }
 
         LinkedHashSet<Integer> uniqueIds = new LinkedHashSet<>();
-        for (JsonNode branchId : branchIds) {
-            if (!branchId.isIntegralNumber() || !branchId.canConvertToInt()) {
+        for (JsonNode branch : branches) {
+            JsonNode branchId = branch.isObject() ? branch.get("id") : null;
+            if (branchId == null || !branchId.isIntegralNumber() || !branchId.canConvertToInt()) {
                 throw new IllegalStateException(
                         "Catalog Service returned a non-integer branch ID");
             }

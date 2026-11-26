@@ -177,6 +177,42 @@ public class InvoiceDetailLotRepository {
             }
         });
     }
+
+    public void replaceByInvoiceId(Long invoiceId, List<InvoiceDetailLot> lots) {
+        db.withConnection(conn -> {
+            boolean previousAutoCommit = conn.getAutoCommit();
+            conn.setAutoCommit(false);
+            try {
+                String deleteSql = "DELETE FROM sales.InvoiceDetailLots " +
+                        "WHERE InvoiceDetailId IN " +
+                        "(SELECT InvoiceDetailId FROM sales.InvoiceDetails WHERE InvoiceId = ?)";
+                try (var delete = conn.prepareStatement(deleteSql)) {
+                    delete.setLong(1, invoiceId);
+                    delete.executeUpdate();
+                }
+
+                String insertSql = "INSERT INTO sales.InvoiceDetailLots " +
+                        "(InvoiceDetailId, LotId, QuantityBase, CostBaseAtSale) VALUES (?, ?, ?, ?)";
+                try (var insert = conn.prepareStatement(insertSql)) {
+                    for (InvoiceDetailLot lot : lots) {
+                        insert.setLong(1, lot.getInvoiceDetailId());
+                        insert.setLong(2, lot.getLotId());
+                        insert.setBigDecimal(3, lot.getQuantityBase());
+                        insert.setBigDecimal(4, lot.getCostBaseAtSale());
+                        insert.addBatch();
+                    }
+                    insert.executeBatch();
+                }
+                conn.commit();
+            } catch (Exception e) {
+                conn.rollback();
+                throw new RuntimeException("Failed to persist invoice lot allocations", e);
+            } finally {
+                conn.setAutoCommit(previousAutoCommit);
+            }
+            return null;
+        });
+    }
     
     /**
      * Map ResultSet row to InvoiceDetailLot object

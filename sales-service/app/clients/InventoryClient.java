@@ -5,23 +5,26 @@ import com.ecwid.consul.v1.health.model.HealthService;
 import com.typesafe.config.Config;
 import integration.consul.ConsulServiceResolver;
 import integration.consul.ServiceResolver;
+import models.InvoiceDetail;
+import play.libs.Json;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 /**
  * InventoryClient - HTTP Client để gọi Inventory Service
  * 
  * The Inventory instance is resolved through Consul.
  * 
- * Methods:
- * - Trừ tồn kho (deduct stock)
- * - Lấy tồn kho theo lot (get stock by lot - FEFO)
- * - Kiểm tra tồn kho đủ (check stock availability)
+ * Sales stock operations are handled atomically by Inventory per invoice.
  * 
  * @author Nhóm 4 - Đại học Quy Nhơn
  */
@@ -39,55 +42,20 @@ public class InventoryClient {
         this.apiPrefix = config.getString("inventory.service.api-prefix");
     }
     
-    /**
-     * Lấy tồn kho theo lô (FEFO - First Expired First Out)
-     * 
-     * GET /inventory/stock-by-lot?drugId=1&quantity=100&branchId=1
-     */
-    public String getStockByLotFefo(Long drugId, BigDecimal quantity, Long branchId) throws Exception {
-        String url = inventoryServiceUrl() + "/stock-by-lot?" +
-                "drugId=" + drugId +
-                "&quantity=" + quantity +
-                "&branchId=" + branchId;
-        
-        return makeHttpGet(url);
-    }
-    
-    /**
-     * Trừ tồn kho (Deduct stock)
-     * 
-     * POST /inventory/deduct
-     */
-    public String deductStock(Long drugId, Long branchId, String lotAllocationsJson) throws Exception {
-        String url = inventoryServiceUrl() + "/deduct";
-        
-        String requestBody = "{" +
-                "\"drugId\": " + drugId + "," +
-                "\"branchId\": " + branchId + "," +
-                "\"lotAllocations\": " + lotAllocationsJson +
-                "}";
-        
-        return makeHttpPost(url, requestBody);
-    }
-    
-    /**
-     * Kiểm tra tồn kho đủ không
-     */
-    public String checkStockAvailability(Long drugId, BigDecimal quantity, Long branchId) throws Exception {
-        String url = inventoryServiceUrl() + "/check-availability?" +
-                "drugId=" + drugId +
-                "&quantity=" + quantity +
-                "&branchId=" + branchId;
-        
-        return makeHttpGet(url);
-    }
-    
-    /**
-     * Lấy chi tiết tồn kho của một thuốc
-     */
-    public String getDrugInventory(Long drugId, Long branchId) throws Exception {
-        String url = inventoryServiceUrl() + "/drug/" + drugId + "/branch/" + branchId;
-        return makeHttpGet(url);
+    public JsonNode deductInvoiceStock(Long invoiceId, Long branchId, List<InvoiceDetail> details)
+            throws Exception {
+        com.fasterxml.jackson.databind.node.ObjectNode request = Json.newObject();
+        request.put("invoiceId", invoiceId);
+        request.put("branchId", branchId);
+        com.fasterxml.jackson.databind.node.ArrayNode items = request.putArray("items");
+        for (InvoiceDetail detail : details) {
+            com.fasterxml.jackson.databind.node.ObjectNode item = items.addObject();
+            item.put("invoiceDetailId", detail.getInvoiceDetailId());
+            item.put("drugId", detail.getDrugId());
+            item.put("quantityBase", detail.getQuantityBase());
+        }
+        String url = inventoryServiceUrl() + "/sales/deduct";
+        return Json.parse(makeHttpPost(url, Json.stringify(request)));
     }
     
     /**
@@ -100,13 +68,12 @@ public class InventoryClient {
      * @return true nếu thành công
      */
     public boolean restoreStockByInvoiceId(Long branchId, Long invoiceId) throws Exception {
-        String url = inventoryServiceUrl() + "/restore-by-invoice/" + invoiceId + "?branchId=" + branchId;
-        
-        String response = makeHttpPost(url, "{}");
-        
-        // Parse response - expect {"success": true}
-        // Simplified: nếu response contains "success" thì coi là OK
-        return response.contains("true");
+        String url = inventoryServiceUrl() + "/sales/restore/" + invoiceId;
+        com.fasterxml.jackson.databind.node.ObjectNode request = Json.newObject();
+        request.put("branchId", branchId);
+        JsonNode response = Json.parse(makeHttpPost(url, Json.stringify(request)));
+        JsonNode success = response.get("success");
+        return success != null && success.isBoolean() && success.booleanValue();
     }
     
     // ========== Helper Methods ==========
@@ -122,21 +89,6 @@ public class InventoryClient {
         return ConsulServiceResolver.baseUrl(instance) + prefix;
     }
     
-    private String makeHttpGet(String urlString) throws Exception {
-        URL url = new URL(urlString);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setRequestMethod("GET");
-        connection.setConnectTimeout(5000);
-        connection.setReadTimeout(5000);
-        
-        int responseCode = connection.getResponseCode();
-        if (responseCode != 200) {
-            throw new RuntimeException("HTTP GET failed: " + responseCode);
-        }
-        
-        return readResponse(connection);
-    }
-    
     private String makeHttpPost(String urlString, String requestBody) throws Exception {
         URL url = new URL(urlString);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
@@ -146,26 +98,33 @@ public class InventoryClient {
         connection.setReadTimeout(5000);
         connection.setDoOutput(true);
         
-        // Send request body
-        try (OutputStream os = connection.getOutputStream()) {
-            byte[] input = requestBody.getBytes("utf-8");
-            os.write(input, 0, input.length);
+        try {
+            try (OutputStream output = connection.getOutputStream()) {
+                output.write(requestBody.getBytes(StandardCharsets.UTF_8));
+            }
+            int responseCode = connection.getResponseCode();
+            InputStream responseStream = responseCode >= 200 && responseCode < 300
+                    ? connection.getInputStream() : connection.getErrorStream();
+            String responseBody = readResponse(responseStream);
+            if (responseCode < 200 || responseCode >= 300) {
+                throw new InventoryClientException(responseCode, responseBody);
+            }
+            return responseBody;
+        } finally {
+            connection.disconnect();
         }
-        
-        int responseCode = connection.getResponseCode();
-        if (responseCode != 200) {
-            throw new RuntimeException("HTTP POST failed: " + responseCode);
-        }
-        
-        return readResponse(connection);
     }
-    
-    private String readResponse(HttpURLConnection connection) throws Exception {
-        try (BufferedReader br = new BufferedReader(new InputStreamReader(connection.getInputStream(), "utf-8"))) {
+
+    private String readResponse(InputStream input) throws Exception {
+        if (input == null) {
+            return "";
+        }
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(input, StandardCharsets.UTF_8))) {
             StringBuilder response = new StringBuilder();
-            String responseLine = null;
-            while ((responseLine = br.readLine()) != null) {
-                response.append(responseLine.trim());
+            String line;
+            while ((line = reader.readLine()) != null) {
+                response.append(line);
             }
             return response.toString();
         }

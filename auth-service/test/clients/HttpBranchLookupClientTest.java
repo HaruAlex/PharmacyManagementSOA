@@ -24,11 +24,12 @@ class HttpBranchLookupClientTest {
         ServiceResolver resolver = resolverWithCatalogInstance();
         WSRequest request = mock(WSRequest.class);
         WSResponse response = mock(WSResponse.class);
-        when(wsClient.url("http://catalog:9002/api/branches/active")).thenReturn(request);
+        when(wsClient.url("http://catalog:9002/api/v1/catalog/branches")).thenReturn(request);
         when(request.setRequestTimeout(5000)).thenReturn(request);
         when(request.get()).thenReturn(CompletableFuture.completedFuture(response));
         when(response.getStatus()).thenReturn(200);
-        when(response.asJson()).thenReturn(Json.parse("{\"branchIds\":[1,2,2,3]}"));
+        when(response.asJson()).thenReturn(Json.parse(
+                "{\"items\":[{\"id\":1,\"status\":\"ACTIVE\"},{\"id\":2},{\"id\":2},{\"id\":3}],\"total\":4}"));
 
         HttpBranchLookupClient client = new HttpBranchLookupClient(wsClient, config(), resolver);
 
@@ -63,7 +64,7 @@ class HttpBranchLookupClientTest {
         when(wsClient.url(anyString())).thenReturn(request);
         when(request.get()).thenReturn(CompletableFuture.completedFuture(response));
         when(response.getStatus()).thenReturn(200);
-        when(response.asJson()).thenReturn(Json.parse("{\"branchIds\":[1,\"2\"]}"));
+        when(response.asJson()).thenReturn(Json.parse("{\"items\":[{\"id\":1},{\"id\":\"2\"}]}"));
 
         when(request.setRequestTimeout(5000)).thenReturn(request);
         HttpBranchLookupClient client = new HttpBranchLookupClient(wsClient, config(), resolver);
@@ -77,7 +78,7 @@ class HttpBranchLookupClientTest {
         return ConfigFactory.parseString(
                 "catalog.service.name=\"catalog-service\"\n"
                         + "catalog.service.timeout-ms=5000\n"
-                        + "catalog.service.activeBranchesPath=\"/api/branches/active\"");
+                        + "catalog.service.activeBranchesPath=\"/api/v1/catalog/branches\"");
     }
 
     private ServiceResolver resolverWithCatalogInstance() {
